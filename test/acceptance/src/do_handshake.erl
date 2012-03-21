@@ -2,6 +2,7 @@
 
 %-export([setup/0, teardown/1, given/3, then/3]).
 -compile([export_all]).
+-include_lib("hamcrest/include/hamcrest.hrl").
 
 setup()->
   start_http_server(self(), 8080),
@@ -17,9 +18,9 @@ given([that, i, want, to, connect, to, a, websocket, server], _State, _) ->
 then([i, upgrade, the, connection, with, a, websocket, handshake], _State, _) ->
   receive
     {client_headers, Headers} ->
-      io:format("H ~w ~n", [Headers])
+      ok
   end,
-  false.
+  assert_that("Upgrade", is(get_header("connection", Headers))).
 
 %
 % Mock a http server
@@ -41,7 +42,6 @@ handshake(Tester, Socket) ->
       Headers = headers(Rest, []),
       %io:format("Hewders ~w ~n", [_Headers]),
       Tester ! {client_headers, Headers},
-      _SecWebSocketKey = 'Sec-WebSocket-Key'(Rest),
       HandShake = [
         "HTTP/1.1 101 Web Socket Protocol Handshake\r\n",
         "Upgrade: WebSocket\r\n",
@@ -63,19 +63,8 @@ headers(Packet, Acc) ->
       Acc
   end.
 
-'Sec-WebSocket-Key'(Packet) ->
-  {ok, {http_header, _, Key, _, Value}, Rest} = erlang:decode_packet(httph, Packet, []),
-
-  F = fun(S) when is_atom(S)-> atom_to_list(S);
-        (S)-> S
-      end,
-
-  case string:to_lower(F(Key)) of
-    "sec-websocket-key" ->
-      Value;
-    _ ->
-      'Sec-WebSocket-Key'(Rest)
-  end.
-
 wait(_Socket)->
   false.
+
+get_header(Key, Headers) ->
+  proplists:get_value(Key, Headers).
