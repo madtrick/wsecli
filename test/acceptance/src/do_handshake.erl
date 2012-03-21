@@ -1,8 +1,10 @@
 -module(do_handshake).
--export([setup/0, teardown/1, given/3, then/3]).
+
+%-export([setup/0, teardown/1, given/3, then/3]).
+-compile([export_all]).
 
 setup()->
-  start_http_server(8080),
+  start_http_server(self(), 8080),
   ok.
 
 teardown(_State) ->
@@ -18,17 +20,23 @@ then([i, the, connection, with, a, websocket, handshake], _State, _) ->
 % Mock a http server
 %
 
-start_http_server(Port) ->
+start_http_server(Tester, Port) ->
   {ok, Listen} = gen_tcp:listen(Port, [{reuseaddr, true}, {packet, raw}, binary]),
-  {ok, Socket} = gen_tcp:accept(Listen),
-  handshake(Socket).
+  spawn_link(fun() -> accept(Tester, Listen) end).
 
-handshake(Socket) ->
+accept(Tester, Listen) ->
+  {ok, Socket} = gen_tcp:accept(Listen),
+ handshake(Tester, Socket).
+
+handshake(Tester, Socket) ->
   receive
     {tcp, Socket, Data } ->
       {ok, {http_request, 'GET', _Uri, _Version}, Rest} = erlang:decode_packet(http, Data, []),
 
-      SecWebSocketKey = 'Sec-WebSocket-Key'(Rest),
+      Headers = headers(Rest, []),
+      %io:format("Hewders ~w ~n", [_Headers]),
+      Tester ! {headers, Headers},
+      _SecWebSocketKey = 'Sec-WebSocket-Key'(Rest),
       HandShake = [
         "HTTP/1.1 101 Web Socket Protocol Handshake\r\n",
         "Upgrade: WebSocket\r\n",
@@ -37,6 +45,17 @@ handshake(Socket) ->
        ],
        gen_tcp:send(Socket, HandShake),
       wait(Socket)
+  end.
+
+headers(Packet, Acc) ->
+  F = fun(S) when is_atom(S)-> atom_to_list(S);
+        (S)-> S
+      end,
+  case erlang:decode_packet(httph, Packet, [])of
+    {ok, {http_header, _, Key, _, Value}, Rest} ->
+      headers(Rest, [{string:to_lower(F(Key)), Value} | Acc]);
+    {ok, http_eoh, _} ->
+      Acc
   end.
 
 'Sec-WebSocket-Key'(Packet) ->
