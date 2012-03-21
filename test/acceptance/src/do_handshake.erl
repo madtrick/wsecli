@@ -11,9 +11,14 @@ teardown(_State) ->
   ok.
 
 given([that, i, want, to, connect, to, a, websocket, server], _State, _) ->
+  wsecli:start("localhost", 8080, "/"),
   {ok, _State}.
 
-then([i, the, connection, with, a, websocket, handshake], _State, _) ->
+then([i, upgrade, the, connection, with, a, websocket, handshake], _State, _) ->
+  receive
+    {client_headers, Headers} ->
+      io:format("H ~w ~n", [Headers])
+  end,
   false.
 
 %
@@ -35,7 +40,7 @@ handshake(Tester, Socket) ->
 
       Headers = headers(Rest, []),
       %io:format("Hewders ~w ~n", [_Headers]),
-      Tester ! {headers, Headers},
+      Tester ! {client_headers, Headers},
       _SecWebSocketKey = 'Sec-WebSocket-Key'(Rest),
       HandShake = [
         "HTTP/1.1 101 Web Socket Protocol Handshake\r\n",
