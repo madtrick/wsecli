@@ -17,12 +17,20 @@ given([that, i, want, to, connect, to, a, websocket, server], _State, _) ->
 
 then([i, upgrade, the, connection, with, a, websocket, handshake], _State, _) ->
   receive
-    {client_headers, Headers} ->
+    {request, Request, headers, Headers} ->
       ok
   end,
-  assert_that("Upgrade", is(get_header("connection", Headers))).
 
-%
+  assert_that('GET'           ,is(get_request_value(method                ,Request))) ,
+  assert_that("/"             ,is(get_request_resource_uri(Request)))     ,
+  assert_that("1.1"           ,is(get_request_version(Request)))          ,
+  assert_that("localhost:8080",is(get_header_value("host"                 ,Headers))) ,
+  assert_that("websocket"     ,is(get_header_value("upgrade"              ,Headers))) ,
+  assert_that("Upgrade"       ,is(get_header_value("connection"           ,Headers))) ,
+  assert_that("13"            ,is(get_header_value("sec-websocket-version",Headers))) ,
+  assert_that(undefined       ,is_not(get_header_value("sec-websocket-key",Headers))).
+  %checar el header origin
+
 % Mock a http server
 %
 
@@ -37,11 +45,12 @@ accept(Tester, Listen) ->
 handshake(Tester, Socket) ->
   receive
     {tcp, Socket, Data } ->
-      {ok, {http_request, 'GET', _Uri, _Version}, Rest} = erlang:decode_packet(http, Data, []),
+      {ok, {http_request, Method, Uri, Version}, Rest} = erlang:decode_packet(http, Data, []),
 
       Headers = headers(Rest, []),
-      %io:format("Hewders ~w ~n", [_Headers]),
-      Tester ! {client_headers, Headers},
+      Request = {request, [{method, Method}, {uri, Uri}, {version, Version}], headers, Headers},
+
+      Tester ! Request,
       HandShake = [
         "HTTP/1.1 101 Web Socket Protocol Handshake\r\n",
         "Upgrade: WebSocket\r\n",
@@ -66,5 +75,17 @@ headers(Packet, Acc) ->
 wait(_Socket)->
   false.
 
-get_header(Key, Headers) ->
+get_header_value(Key, Headers) ->
   proplists:get_value(Key, Headers).
+
+get_request_resource_uri(Request) ->
+  {abs_path, Path} = get_request_value(uri, Request),
+  Path.
+
+get_request_version(Request) ->
+  {X, Y} = get_request_value(version, Request),
+  integer_to_list(X) ++ "." ++ integer_to_list(Y).
+
+get_request_value(Key, Request) ->
+  proplists:get_value(Key, Request).
+
