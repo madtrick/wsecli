@@ -1,4 +1,4 @@
--module(wsecli_handshake).
+-module(wsecli_handshake_spec).
 -include_lib("espec/include/espec.hrl").
 -include_lib("hamcrest/include/hamcrest.hrl").
 
