@@ -9,8 +9,9 @@ spec() ->
               %meck:new(crypto, [passthrough]),
               meck:new(base64, [unstick, passthrough]),
 
-              <<_Key:16>> = wsecli_key:generate(),
+              Key = wsecli_key:generate(),
 
+              assert_that(length(Key), is(24)),
               %assert_that(meck:called(crypto, rand_bytes, 16), is(true)),
               assert_that(meck:called(base64, encode, '_'), is(true)),
               meck:unload(base64)
