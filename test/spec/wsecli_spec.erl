@@ -5,8 +5,15 @@
 
 spec() ->
   describe("wsecli", fun() ->
+        before_all(fun() ->
+              spec_set(start_http_server(self(), 8080), "http_server")
+          end),
+
+        after_all(fun() ->
+              stop_http_server(spec_get("http_server"))
+          end),
+
         it("should open a tcp connection to the desired Host", fun() ->
-              start_http_server(self(), 8080),
               meck:new(gen_tcp, [unstick, passthrough]),
 
               Host = "localhost",
@@ -27,14 +34,31 @@ start_http_server(Tester, Port) ->
   {ok, Listen} = gen_tcp:listen(Port, [{reuseaddr, true}, {packet, raw}, binary]),
   spawn_link(fun() -> accept(Tester, Listen) end).
 
+stop_http_server(Server) ->
+  Server ! {stop, self()},
+  receive
+    {stopped, Server} ->
+      ok
+  end.
+
 accept(Tester, Listen) ->
-  error_logger:error_msg("Hey ~n"),
-  {ok, Socket} = gen_tcp:accept(Listen),
- handshake(Tester, Socket).
+  receive
+    {stop, From} ->
+      stop(Listen, From)
+    after 100 -> true
+  end,
+
+  case gen_tcp:accept(Listen, 100) of
+    {ok, Socket} ->
+      handshake(Tester, Socket);
+    {error, timeout} ->
+      accept(Tester, Listen)
+  end.
 
 handshake(Tester, Socket) ->
-  error_logger:error_msg("HOU ~n"),
   receive
+    {stop, From} ->
+      stop(Socket, From);
     {tcp, Socket, Data } ->
       {ok, {http_request, Method, Uri, Version}, Rest} = erlang:decode_packet(http, Data, []),
 
@@ -64,7 +88,12 @@ headers(Packet, Acc) ->
   end.
 
 wait(_Socket)->
-  false.
+      ok.
+
+stop(Socket, From)->
+  gen_tcp:close(Socket),
+  From ! {stoppend, self()},
+  exit(normal).
 
 %get_header_value(Key, Headers) ->
   %proplists:get_value(Key, Headers).
