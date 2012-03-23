@@ -23,6 +23,8 @@ spec() ->
               wsecli:start(Host, Port, Resource),
 
               assert_that(meck:called(gen_tcp, connect, '_'), is(true)),
+              meck:unload(gen_tcp),
+              wsecli:stop()
               meck:unload(gen_tcp)
           end)
     end).
