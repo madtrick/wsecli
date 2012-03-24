@@ -25,7 +25,19 @@ spec() ->
               assert_that(meck:called(gen_tcp, connect, '_'), is(true)),
               meck:unload(gen_tcp),
               wsecli:stop()
-              meck:unload(gen_tcp)
+          end),
+        it("should send an opening handshake when connected", fun() ->
+              meck:new(gen_tcp, [unstick, passthrough]),
+
+              Host = "localhost",
+              Port = 8080,
+              Resource = "/",
+
+              wsecli:start(Host, Port, Resource),
+
+              assert_that(meck:called(gen_tcp, send, '_'), is(true)),
+              meck:unload(gen_tcp),
+              wsecli:stop()
           end)
     end).
 
@@ -52,31 +64,34 @@ accept(Tester, Listen) ->
 
   case gen_tcp:accept(Listen, 100) of
     {ok, Socket} ->
-      handshake(Tester, Socket);
+      loop(Tester, Socket);
     {error, timeout} ->
       accept(Tester, Listen)
   end.
 
-handshake(Tester, Socket) ->
+loop(Tester, Socket) ->
   receive
     {stop, From} ->
       stop(Socket, From);
-    {tcp, Socket, Data } ->
-      {ok, {http_request, Method, Uri, Version}, Rest} = erlang:decode_packet(http, Data, []),
-
-      Headers = headers(Rest, []),
-      Request = {request, [{method, Method}, {uri, Uri}, {version, Version}], headers, Headers},
-
-      Tester ! Request,
-      HandShake = [
-        "HTTP/1.1 101 Web Socket Protocol Handshake\r\n",
-        "Upgrade: WebSocket\r\n",
-        "Connection: Upgrade\r\n",
-        "Sec-WebSocket-Accept: Hash\r\n\r\n"
-       ],
-       gen_tcp:send(Socket, HandShake),
-      wait(Socket)
+    {tcp, Socket, Data} ->
+      handshake(Tester, Socket, Data),
+      loop(Tester, Socket)
   end.
+
+handshake(Tester, Socket, Data) ->
+  {ok, {http_request, Method, Uri, Version}, Rest} = erlang:decode_packet(http, Data, []),
+
+  Headers = headers(Rest, []),
+  Request = {request, [{method, Method}, {uri, Uri}, {version, Version}], headers, Headers},
+
+  Tester ! Request,
+  HandShake = [
+    "HTTP/1.1 101 Web Socket Protocol Handshake\r\n",
+    "Upgrade: WebSocket\r\n",
+    "Connection: Upgrade\r\n",
+    "Sec-WebSocket-Accept: Hash\r\n\r\n"
+  ],
+  gen_tcp:send(Socket, HandShake).
 
 headers(Packet, Acc) ->
   F = fun(S) when is_atom(S)-> atom_to_list(S);
@@ -88,9 +103,6 @@ headers(Packet, Acc) ->
     {ok, http_eoh, _} ->
       Acc
   end.
-
-wait(_Socket)->
-      ok.
 
 stop(Socket, From)->
   gen_tcp:close(Socket),
