@@ -7,7 +7,7 @@ spec() ->
   describe("wsecli_http", fun() ->
         it("should build proper HTTP request strings", fun() ->
           RequestLine = [
-            {method, 'GET'},
+            {method, "GET"},
             {version, "1.1"},
             {resource, "/"}
           ],
@@ -22,7 +22,8 @@ spec() ->
           assert_that(Request, is([
                 "GET / HTTP/1.1\r\n",
                 "Header-A: A\r\n",
-                "Header-B: B\r\n\r\n"
+                "Header-B: B\r\n",
+                "\r\n"
               ]))
       end)
     end).
