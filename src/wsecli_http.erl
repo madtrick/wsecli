@@ -1,6 +1,9 @@
 -module(wsecli_http).
+-include("wsecli.hrl").
 
--export([request/2]).
+-export([request/2, to_response/1]).
+
+-define(CTRL, "\r\n").
 
 -spec request(RequestLine::list({atom(), string()}), Headers::list({atom(), string()})) -> list(string()).
 request(RequestLine, Headers) ->
@@ -22,3 +25,18 @@ build_request_line(RequestLine, Acc) ->
   Resource = proplists:get_value(resource, RequestLine),
 
   [Method ++ " " ++ Resource ++ " " ++ "HTTP/" ++ Version ++ "\r\n" | Acc].
+
+-spec to_response(Data::binary()) -> #http_message{}.
+to_response(Data) ->
+  [StatusLine | Headers] = binary:split(Data, <<?CTRL>>, [trim, global]),
+  {match, [_, Version, Status, Reason]} = re:run(StatusLine, "HTTP/([0-9]\.[0-9])\s([0-9]{3,3})\s([a-zA-z0-9 ]+)", [{capture, all, list}]),
+
+  StatusLineList = [{version, Version}, {status, Status}, {reason, Reason}],
+
+  HeadersList = lists:foldr(fun(Element, Acc) ->
+        {match, [_Match, HeaderName, HeaderValue]} = re:run(Element, "(\.+):\s+(\.+)", [{capture, all, list}]),
+        [{list_to_atom(string:strip(HeaderName)), HeaderValue} | Acc]
+    end, [], Headers),
+
+
+  #http_message{ type = response , start_line = StatusLineList, headers = HeadersList}.

@@ -25,5 +25,28 @@ spec() ->
                 "Header-B: B\r\n",
                 "\r\n"
               ]))
+      end),
+    it("should build a proper HTTP response from binary message", fun() ->
+          Data = <<"HTTP/1.1 205 Reset Content\r\n
+          Header-A: A\r\n
+          Header-C: dGhlIHNhbXBsZSBub25jZQ==\r\n
+          Header-D: D\r\n\r\n">>,
+
+          StatusLine = [
+            {version, "1.1"},
+            {status, "205"},
+            {reason, "Reset Content"}
+          ],
+
+          Headers = [
+            {'Header-A', "A"},
+            {'Header-C', "dGhlIHNhbXBsZSBub25jZQ=="},
+            {'Header-D', "D"}
+          ],
+
+          ExpectedResponse = #http_message{type = response, start_line = StatusLine, headers = Headers},
+          Response = wsecli_http:to_response(Data),
+
+          assert_that(Response, is(ExpectedResponse))
       end)
     end).
