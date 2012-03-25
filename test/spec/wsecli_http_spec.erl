@@ -39,14 +39,49 @@ spec() ->
           ],
 
           Headers = [
-            {'Header-A', "A"},
-            {'Header-C', "dGhlIHNhbXBsZSBub25jZQ=="},
-            {'Header-D', "D"}
+            {'header-a', "A"},
+            {'header-c', "dGhlIHNhbXBsZSBub25jZQ=="},
+            {'header-d', "D"}
           ],
 
           ExpectedResponse = #http_message{type = response, start_line = StatusLine, headers = Headers},
           Response = wsecli_http:to_response(Data),
 
           assert_that(Response, is(ExpectedResponse))
+      end),
+    it("should return http_message start_line values if present", fun() ->
+          Message = #http_message{
+            type = request,
+            start_line = [
+              {method, "GET"},
+              {version, "1.1"},
+              {resource, "/"}
+            ],
+            headers = [
+              {'header-a', "A"},
+              {'header-b', "b"}
+            ]
+          },
+
+          assert_that(wsecli_http:get_start_line_value(version, Message), is("1.1")),
+          assert_that(wsecli_http:get_start_line_value(method, Message), is("GET")),
+          assert_that(wsecli_http:get_start_line_value(resource, Message), is("/"))
+      end),
+    it("should return http_message header values if present", fun() ->
+          Message = #http_message{
+            type = request,
+            start_line = [
+              {method, "GET"},
+              {version, "1.1"},
+              {resource, "/"}
+            ],
+            headers = [
+              {'header-a', "A"},
+              {'header-b', "b"}
+            ]
+          },
+
+          assert_that(wsecli_http:get_header_value('header-a', Message), is("A")),
+          assert_that(wsecli_http:get_header_value('header-b', Message), is("b"))
       end)
     end).

@@ -1,7 +1,7 @@
 -module(wsecli_http).
 -include("wsecli.hrl").
 
--export([request/2, to_response/1]).
+-export([request/2, to_response/1, get_start_line_value/2, get_header_value/2]).
 
 -define(CTRL, "\r\n").
 
@@ -35,8 +35,16 @@ to_response(Data) ->
 
   HeadersList = lists:foldr(fun(Element, Acc) ->
         {match, [_Match, HeaderName, HeaderValue]} = re:run(Element, "(\.+):\s+(\.+)", [{capture, all, list}]),
-        [{list_to_atom(string:strip(HeaderName)), HeaderValue} | Acc]
+        [{list_to_atom(string:to_lower(string:strip(HeaderName))), HeaderValue} | Acc]
     end, [], Headers),
 
 
   #http_message{ type = response , start_line = StatusLineList, headers = HeadersList}.
+
+-spec get_start_line_value(Key::atom(), Message::#http_message{}) -> string().
+get_start_line_value(Key, Message) ->
+  proplists:get_value(Key, Message#http_message.start_line).
+
+-spec get_header_value(Key::atom(), Message::#http_message{}) -> string().
+get_header_value(Key, Message) ->
+  proplists:get_value(Key, Message#http_message.headers).
