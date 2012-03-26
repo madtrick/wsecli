@@ -5,6 +5,28 @@
 
 spec() ->
   describe("wsecli_http", fun() ->
+        it("should build proper HTTP messages", fun() ->
+          RequestLine = [
+            {method, "GET"},
+            {version, "1.1"},
+            {resource, "/"}
+          ],
+
+          Headers = [
+            {'Header-A', "A"},
+            {'Header-B', "B"}
+          ],
+
+          Message = wsecli_http:build(request, RequestLine, Headers),
+
+          assert_that(Message#http_message.type, is(request)),
+
+          assert_that(proplists:get_value(method, Message#http_message.start_line), is("GET")),
+          assert_that(proplists:get_value(version, Message#http_message.start_line), is("1.1")),
+          assert_that(proplists:get_value(resource, Message#http_message.start_line), is("/")),
+          assert_that(proplists:get_value('Header-A', Message#http_message.headers), is("A")),
+          assert_that(proplists:get_value('Header-B', Message#http_message.headers), is("B"))
+          end),
         it("should build proper HTTP request strings", fun() ->
           RequestLine = [
             {method, "GET"},
