@@ -42,8 +42,7 @@ from_response(Data) ->
         [{string:strip(HeaderName), HeaderValue} | Acc]
     end, [], Headers),
 
-
-  #http_message{ type = response , start_line = StatusLineList, headers = HeadersList}.
+  wsecli_http:build(response, StatusLineList, HeadersList).
 
 -spec get_start_line_value(Key::atom(), Message::#http_message{}) -> string().
 get_start_line_value(Key, Message) ->
