@@ -24,5 +24,28 @@ spec() ->
               assert_that(wsecli_http:get_header_value("Connection", HttpMessage), is("upgrade")),
               assert_that(wsecli_http:get_header_value("Sec-Websocket-Key", HttpMessage), is_not(undefined)),
               assert_that(wsecli_http:get_header_value("Sec-Websocket-Version", HttpMessage), is("13"))
+          end),
+        it("should validate a handshake response", fun() ->
+              Resource = "/",
+              Host = "localhost",
+              Port = 8080,
+
+              HandShake = wsecli_handshake:build(Resource, Host, Port),
+              Key = wsecli_http:get_header_value("sec-websocket-key", HandShake#handshake.message),
+
+              BinResponse = list_to_binary(["HTTP/1.1 101 Switch Protocols\r\n
+              Upgrade: websocket\r\n
+              Connection: upgrade\r\n
+              Sec-Websocket-Accept: ", fake_sec_websocket_accept(Key), "\r\n",
+              "Header-A: A\r\n
+              Header-C: 123123\r\n
+              Header-D: D\r\n\r\n"]),
+              Response = wsecli_http:from_response(BinResponse),
+
+              assert_that(wsecli_handshake:validate(Response, HandShake),is(true))
           end)
     end).
+
+fake_sec_websocket_accept(Key) ->
+  BinaryKey = list_to_binary(Key),
+  base64:encode_to_string(crypto:sha(<<BinaryKey/binary, "258EAFA5-E914-47DA-95CA-C5AB0DC85B11">>)).
