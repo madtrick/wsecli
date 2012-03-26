@@ -14,15 +14,12 @@ build(Resource, Host, Port) ->
   ],
 
   Headers =[
-    {host, Host ++ ":" ++ integer_to_list(Port)},
-    {upgrade, "websocket"},
-    {connection, "upgrade"},
-    {'sec-websocket-key', wsecli_key:generate()},
-    {'sec-websocket-version', integer_to_list(?VERSION)}
+    {"Host", Host ++ ":" ++ integer_to_list(Port)},
+    {"Upgrade", "websocket"},
+    {"Connection", "upgrade"},
+    {"Sec-Websocket-Key", wsecli_key:generate()},
+    {"Sec-Websocket-Version", integer_to_list(?VERSION)}
   ],
 
-  #handshake{
-    version = ?VERSION,
-    request_line = RequestLine,
-    headers = Headers
-  }.
+  Message = wsecli_http:build(request, RequestLine, Headers),
+  #handshake{ version = ?VERSION, message = Message}.

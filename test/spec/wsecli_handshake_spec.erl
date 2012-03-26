@@ -14,16 +14,15 @@ spec() ->
               HandShake = wsecli_handshake:build(Resource, Host, Port),
               assert_that(HandShake#handshake.version, is(13)),
 
-              RequestLine = HandShake#handshake.request_line,
-              assert_that(proplists:get_value(method, RequestLine), is("GET")),
-              assert_that(proplists:get_value(version, RequestLine), is("1.1")),
-              assert_that(proplists:get_value(resource, RequestLine), is(Resource)),
+              HttpMessage = HandShake#handshake.message,
+              assert_that(wsecli_http:get_start_line_value(method, HttpMessage), is("GET")),
+              assert_that(wsecli_http:get_start_line_value(version, HttpMessage), is("1.1")),
+              assert_that(wsecli_http:get_start_line_value(resource, HttpMessage), is("/")),
 
-              Headers = HandShake#handshake.headers,
-              assert_that(proplists:get_value(host, Headers), is(Host ++ ":" ++ integer_to_list(Port))),
-              assert_that(proplists:get_value(upgrade, Headers), is("websocket")),
-              assert_that(proplists:get_value(connection, Headers), is("upgrade")),
-              assert_that(proplists:get_value('sec-websocket-key', Headers), is_not(undefined)),
-              assert_that(proplists:get_value('sec-websocket-version', Headers), is("13"))
+              assert_that(wsecli_http:get_header_value("Host", HttpMessage), is(Host ++ ":" ++ integer_to_list(Port))),
+              assert_that(wsecli_http:get_header_value("Upgrade", HttpMessage), is("websocket")),
+              assert_that(wsecli_http:get_header_value("Connection", HttpMessage), is("upgrade")),
+              assert_that(wsecli_http:get_header_value("Sec-Websocket-Key", HttpMessage), is_not(undefined)),
+              assert_that(wsecli_http:get_header_value("Sec-Websocket-Version", HttpMessage), is("13"))
           end)
     end).

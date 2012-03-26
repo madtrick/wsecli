@@ -29,7 +29,7 @@ init({Host, Port, Resource}) ->
   {ok, Socket} = gen_tcp:connect(Host, Port, [binary, {reuseaddr, true}, {packet, raw}] ),
 
   Handshake = wsecli_handshake:build(Resource, Host, Port),
-  Request = wsecli_http:request(Handshake#handshake.request_line, Handshake#handshake.headers),
+  Request = wsecli_http:to_request(Handshake#message),
 
   ok = gen_tcp:send(Socket, Request),
   {ok, connecting, #data{ socket = Socket}}.
