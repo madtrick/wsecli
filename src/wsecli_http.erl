@@ -1,7 +1,7 @@
 -module(wsecli_http).
 -include("wsecli.hrl").
 
--export([build/3, request/2, to_response/1, get_start_line_value/2, get_header_value/2]).
+-export([build/3, request/2, from_response/1, get_start_line_value/2, get_header_value/2]).
 
 -define(CTRL, "\r\n").
 
@@ -30,8 +30,8 @@ build_request_line(RequestLine, Acc) ->
 
   [Method ++ " " ++ Resource ++ " " ++ "HTTP/" ++ Version ++ "\r\n" | Acc].
 
--spec to_response(Data::binary()) -> #http_message{}.
-to_response(Data) ->
+-spec from_response(Data::binary()) -> #http_message{}.
+from_response(Data) ->
   [StatusLine | Headers] = binary:split(Data, <<?CTRL>>, [trim, global]),
   {match, [_, Version, Status, Reason]} = re:run(StatusLine, "HTTP/([0-9]\.[0-9])\s([0-9]{3,3})\s([a-zA-z0-9 ]+)", [{capture, all, list}]),
 
@@ -56,7 +56,7 @@ get_header_value(Key, Message) ->
 
 -spec get_header_value_case_insensitive(Key::string(), list()) ->  undefined;
                                         (Key::string(), list()) -> string().
-get_header_value_case_insensitive(Key, []) ->
+get_header_value_case_insensitive(_, []) ->
   undefined;
 
 get_header_value_case_insensitive(Key, [{Name, Value} | Tail]) ->

@@ -67,7 +67,7 @@ spec() ->
           ],
 
           ExpectedResponse = #http_message{type = response, start_line = StatusLine, headers = Headers},
-          Response = wsecli_http:to_response(Data),
+          Response = wsecli_http:from_response(Data),
 
           assert_that(Response, is(ExpectedResponse))
       end),
