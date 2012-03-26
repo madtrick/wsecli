@@ -5,24 +5,24 @@
 
 -define(CTRL, "\r\n").
 
--spec build(Type::atom(), StartLine::list({atom(), string()}), Headers::list({atom(), string()})) -> list(string()).
+-spec build(Type::atom(), StartLine::list({atom(), string()}), Headers::list({string(), string()})) -> list(string()).
 build(Type, StartLine, Headers) ->
   #http_message{type = Type, start_line = StartLine, headers = Headers}.
 
--spec request(RequestLine::list({atom(), string()}), Headers::list({atom(), string()})) -> list(string()).
+-spec request(RequestLine::list({atom(), string()}), Headers::list({string(), string()})) -> list(string()).
 request(RequestLine, Headers) ->
   build_request_line(
     RequestLine,
     build_headers(Headers, ["\r\n"])
   ).
 
--spec build_headers(list({atom(), string()}), list(string())) -> list(string()).
+-spec build_headers(list({HeaderName::string(), HeaderValue::string()}), list(string())) -> list(string()).
 build_headers(Headers, Acc) ->
   lists:foldr(fun({Key, Value}, AccIn) ->
-        [ atom_to_list(Key) ++ ": " ++ Value ++ "\r\n" | AccIn]
+        [ Key ++ ": " ++ Value ++ "\r\n" | AccIn]
     end, Acc, Headers).
 
--spec build_request_line(list({atom(), string()}), list(string())) -> list(string()).
+-spec build_request_line(list({Name::atom(), Value::string()}), list(string())) -> list(string()).
 build_request_line(RequestLine, Acc) ->
   Method   = proplists:get_value(method, RequestLine),
   Version  = proplists:get_value(version, RequestLine),
@@ -39,7 +39,7 @@ to_response(Data) ->
 
   HeadersList = lists:foldr(fun(Element, Acc) ->
         {match, [_Match, HeaderName, HeaderValue]} = re:run(Element, "(\.+):\s+(\.+)", [{capture, all, list}]),
-        [{list_to_atom(string:to_lower(string:strip(HeaderName))), HeaderValue} | Acc]
+        [{string:strip(HeaderName), HeaderValue} | Acc]
     end, [], Headers),
 
 

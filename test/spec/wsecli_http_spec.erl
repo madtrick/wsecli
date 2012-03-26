@@ -13,8 +13,8 @@ spec() ->
           ],
 
           Headers = [
-            {'Header-A', "A"},
-            {'Header-B', "B"}
+            {"Header-A", "A"},
+            {"Header-B", "B"}
           ],
 
           Message = wsecli_http:build(request, RequestLine, Headers),
@@ -24,8 +24,8 @@ spec() ->
           assert_that(proplists:get_value(method, Message#http_message.start_line), is("GET")),
           assert_that(proplists:get_value(version, Message#http_message.start_line), is("1.1")),
           assert_that(proplists:get_value(resource, Message#http_message.start_line), is("/")),
-          assert_that(proplists:get_value('Header-A', Message#http_message.headers), is("A")),
-          assert_that(proplists:get_value('Header-B', Message#http_message.headers), is("B"))
+          assert_that(proplists:get_value("Header-A", Message#http_message.headers), is("A")),
+          assert_that(proplists:get_value("Header-B", Message#http_message.headers), is("B"))
           end),
         it("should build proper HTTP request strings", fun() ->
           RequestLine = [
@@ -35,8 +35,8 @@ spec() ->
           ],
 
           Headers = [
-            {'Header-A', "A"},
-            {'Header-B', "B"}
+            {"Header-A", "A"},
+            {"Header-B", "B"}
           ],
 
           Request = wsecli_http:request(RequestLine, Headers),
@@ -61,9 +61,9 @@ spec() ->
           ],
 
           Headers = [
-            {'header-a', "A"},
-            {'header-c', "dGhlIHNhbXBsZSBub25jZQ=="},
-            {'header-d', "D"}
+            {"Header-A", "A"},
+            {"Header-C", "dGhlIHNhbXBsZSBub25jZQ=="},
+            {"Header-D", "D"}
           ],
 
           ExpectedResponse = #http_message{type = response, start_line = StatusLine, headers = Headers},
@@ -80,8 +80,8 @@ spec() ->
               {resource, "/"}
             ],
             headers = [
-              {'header-a', "A"},
-              {'header-b', "b"}
+              {"header-a", "A"},
+              {"header-b", "b"}
             ]
           },
 
@@ -98,12 +98,12 @@ spec() ->
               {resource, "/"}
             ],
             headers = [
-              {'header-a', "A"},
-              {'header-b', "b"}
+              {"header-a", "A"},
+              {"header-b", "b"}
             ]
           },
 
-          assert_that(wsecli_http:get_header_value('header-a', Message), is("A")),
-          assert_that(wsecli_http:get_header_value('header-b', Message), is("b"))
+          assert_that(wsecli_http:get_header_value("header-a", Message), is("A")),
+          assert_that(wsecli_http:get_header_value("header-b", Message), is("b"))
       end)
     end).
