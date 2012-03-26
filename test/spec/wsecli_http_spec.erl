@@ -98,8 +98,8 @@ spec() ->
               {resource, "/"}
             ],
             headers = [
-              {"header-a", "A"},
-              {"header-b", "b"}
+              {"Header-a", "A"},
+              {"header-B", "b"}
             ]
           },
 

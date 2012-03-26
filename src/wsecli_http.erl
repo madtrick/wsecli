@@ -49,6 +49,21 @@ to_response(Data) ->
 get_start_line_value(Key, Message) ->
   proplists:get_value(Key, Message#http_message.start_line).
 
--spec get_header_value(Key::atom(), Message::#http_message{}) -> string().
+-spec get_header_value(Key::string(), Message::#http_message{}) -> string().
 get_header_value(Key, Message) ->
-  proplists:get_value(Key, Message#http_message.headers).
+  LowerCasedKey = string:to_lower(Key),
+  get_header_value_case_insensitive(LowerCasedKey, Message#http_message.headers).
+
+-spec get_header_value_case_insensitive(Key::string(), list()) ->  undefined;
+                                        (Key::string(), list()) -> string().
+get_header_value_case_insensitive(Key, []) ->
+  undefined;
+
+get_header_value_case_insensitive(Key, [{Name, Value} | Tail]) ->
+  LowerCaseName = string:to_lower(Name),
+  case Key == LowerCaseName of
+    true ->
+      Value;
+    false ->
+      get_header_value_case_insensitive(Key, Tail)
+  end.
