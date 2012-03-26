@@ -5,12 +5,12 @@
 
 spec() ->
   describe("wsecli", fun() ->
-        before_all(fun() ->
-              spec_set(start_http_server(self(), 8080), "http_server")
+        before_each(fun() ->
+              start_http_server(self(), 8080)
           end),
 
-        after_all(fun() ->
-              stop_http_server(spec_get("http_server"))
+        after_each(fun() ->
+              stop_http_server('_')
           end),
 
         it("should open a tcp connection to the desired Host", fun() ->
@@ -38,6 +38,27 @@ spec() ->
               assert_that(meck:called(gen_tcp, send, '_'), is(true)),
               meck:unload(gen_tcp),
               wsecli:stop()
+          end),
+        describe("on successful handshake", fun() ->
+              it("should invoke on_open callback", fun() ->
+                    Host = "localhost",
+                    Port = 8080,
+                    Resource = "/",
+
+                    Pid = self(),
+                    wsecli:start(Host, Port, Resource),
+                    wsecli:on_open(fun() -> Pid ! on_open end),
+
+                    assert_that((fun() ->
+                          receive
+                            on_open ->
+                              true
+                          after 500 ->
+                              false
+                          end
+                      end)(), is(true)),
+                    wsecli:stop()
+                end)
           end)
     end).
 
@@ -46,12 +67,12 @@ spec() ->
 
 start_http_server(Tester, Port) ->
   {ok, Listen} = gen_tcp:listen(Port, [{reuseaddr, true}, {packet, raw}, binary]),
-  spawn_link(fun() -> accept(Tester, Listen) end).
+  register(mock_http_server, spawn_link(fun() -> accept(Tester, Listen) end)).
 
-stop_http_server(Server) ->
-  Server ! {stop, self()},
+stop_http_server(_) ->
+  mock_http_server ! {stop, self()},
   receive
-    {stopped, Server} ->
+    stopped ->
       ok
   end.
 
@@ -83,13 +104,16 @@ handshake(Tester, Socket, Data) ->
 
   Headers = headers(Rest, []),
   Request = {request, [{method, Method}, {uri, Uri}, {version, Version}], headers, Headers},
+  BinaryClientKey = list_to_binary(get_header_value("sec-websocket-key", Headers)),
 
   Tester ! Request,
   HandShake = [
     "HTTP/1.1 101 Web Socket Protocol Handshake\r\n",
     "Upgrade: WebSocket\r\n",
     "Connection: Upgrade\r\n",
-    "Sec-WebSocket-Accept: Hash\r\n\r\n"
+    "Sec-WebSocket-Accept: ",
+    base64:encode_to_string(crypto:sha(<<BinaryClientKey/binary, "258EAFA5-E914-47DA-95CA-C5AB0DC85B11">>)),
+    "\r\n\r\n"
   ],
   gen_tcp:send(Socket, HandShake).
 
@@ -106,11 +130,11 @@ headers(Packet, Acc) ->
 
 stop(Socket, From)->
   gen_tcp:close(Socket),
-  From ! {stoppend, self()},
+  From ! stopped,
   exit(normal).
 
-%get_header_value(Key, Headers) ->
-  %proplists:get_value(Key, Headers).
+get_header_value(Key, Headers) ->
+  proplists:get_value(Key, Headers).
 
 %get_request_resource_uri(Request) ->
   %{abs_path, Path} = get_request_value(uri, Request),

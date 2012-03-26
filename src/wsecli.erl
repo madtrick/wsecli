@@ -4,11 +4,17 @@
 -include("wsecli.hrl").
 
 -export([start/3, stop/0]).
+-export([on_open/1]).
 -export([init/1, connecting/2, open/2, closing/2, closed/2]).
 -export([handle_event/3, handle_sync_event/4, handle_info/3, terminate/3, code_change/4]).
 
+-record(callbacks, {
+    on_open :: fun()
+  }).
 -record(data, {
-    socket :: gen_tcp:socket()
+    socket :: gen_tcp:socket(),
+    handshake :: #handshake{},
+    cb  = #callbacks{}
   }).
 
 -spec start(Host::string(), Port::integer(), Resource::string()) -> pid().
@@ -20,6 +26,10 @@ start(Host, Port, Path)->
 stop() ->
   gen_fsm:sync_send_all_state_event(wsecli, stop).
 
+-spec on_open(Callback::fun()) -> any().
+on_open(Callback) ->
+  gen_fsm:send_event(wsecli, {on_open, Callback}).
+
 
 %
 % GEN_FSM behaviour functions
@@ -29,12 +39,17 @@ init({Host, Port, Resource}) ->
   {ok, Socket} = gen_tcp:connect(Host, Port, [binary, {reuseaddr, true}, {packet, raw}] ),
 
   Handshake = wsecli_handshake:build(Resource, Host, Port),
-  Request = wsecli_http:to_request(Handshake#message),
+  Request = wsecli_http:to_request(Handshake#handshake.message),
 
   ok = gen_tcp:send(Socket, Request),
-  {ok, connecting, #data{ socket = Socket}}.
+  {ok, connecting, #data{ socket = Socket, handshake = Handshake}}.
 
--spec connecting(Event::term(), StateData::#data{}) -> term().
+-spec connecting({on_open, Callback::fun()}, StateData::#data{}) -> term();
+                (Event::term(), StateData::#data{}) -> term().
+connecting({on_open, Callback}, StateData) ->
+  Callbacks = StateData#data.cb#callbacks{on_open = Callback},
+  {next_state, connecting, StateData#data{cb = Callbacks}};
+
 connecting(Event, StateData) ->
   connecting.
 
@@ -65,13 +80,20 @@ handle_sync_event(Event, From, StateName, StateData) ->
 
 -spec handle_info({tcp, Socket::gen_tcp:socket(), Data::binary()}, connecting, #data{}) -> {next_state, atom(), #data{}}.
 handle_info({tcp, Socket, Data}, connecting, StateData) ->
-  {next_state, connecting, StateData};
+  Response = wsecli_http:from_response(Data),
+  case wsecli_handshake:validate(Response, StateData#data.handshake) of
+    true ->
+      (StateData#data.cb#callbacks.on_open)(),
+      {next_state, open, StateData};
+    false ->
+      {stop, failed_handshake, StateData}
+  end;
 
 handle_info(Info, StateName, StateData) ->
   handle_info.
 
--spec terminate(stop, atom(), #data{}) -> [].
-terminate(normal, _StateName, StateData) ->
+-spec terminate(Reason::atom(), StateName::atom(), #data{}) -> [].
+terminate(_Reason, _StateName, StateData) ->
   gen_tcp:close(StateData#data.socket).
 
 code_change(OldVsn, StateName, StateData, Extra) ->
