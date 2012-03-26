@@ -39,7 +39,8 @@ spec() ->
             {"Header-B", "B"}
           ],
 
-          Request = wsecli_http:to_request(RequestLine, Headers),
+          Message = wsecli_http:build(request, RequestLine, Headers),
+          Request = wsecli_http:to_request(Message),
 
           assert_that(Request, is([
                 "GET / HTTP/1.1\r\n",

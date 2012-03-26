@@ -1,7 +1,7 @@
 -module(wsecli_http).
 -include("wsecli.hrl").
 
--export([build/3, to_request/2, from_response/1, get_start_line_value/2, get_header_value/2]).
+-export([build/3, to_request/1, from_response/1, get_start_line_value/2, get_header_value/2]).
 
 -define(CTRL, "\r\n").
 
@@ -9,11 +9,11 @@
 build(Type, StartLine, Headers) ->
   #http_message{type = Type, start_line = StartLine, headers = Headers}.
 
--spec to_request(RequestLine::list({atom(), string()}), Headers::list({string(), string()})) -> list(string()).
-to_request(RequestLine, Headers) ->
+-spec to_request(Message::#http_message{}) -> list(string()).
+to_request(Message) ->
   build_request_line(
-    RequestLine,
-    build_headers(Headers, ["\r\n"])
+    Message#http_message.start_line,
+    build_headers(Message#http_message.headers, ["\r\n"])
   ).
 
 -spec build_headers(list({HeaderName::string(), HeaderValue::string()}), list(string())) -> list(string()).
