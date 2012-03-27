@@ -1,0 +1,63 @@
+-module(wsecli_spec).
+-include_lib("espec/include/espec.hrl").
+-include_lib("hamcrest/include/hamcrest.hrl").
+%-compile([export_all]).
+
+spec() ->
+  describe("wsecli", fun() ->
+        before_each(fun() ->
+              mock_http_server:start(self(), 8080)
+          end),
+
+        after_each(fun() ->
+              mock_http_server:stop()
+          end),
+
+        it("should open a tcp connection to the desired Host", fun() ->
+              meck:new(gen_tcp, [unstick, passthrough]),
+
+              Host = "localhost",
+              Port = 8080,
+              Resource = "/",
+
+              wsecli:start(Host, Port, Resource),
+
+              assert_that(meck:called(gen_tcp, connect, '_'), is(true)),
+              meck:unload(gen_tcp),
+              wsecli:stop()
+          end),
+        it("should send an opening handshake when connected", fun() ->
+              meck:new(gen_tcp, [unstick, passthrough]),
+
+              Host = "localhost",
+              Port = 8080,
+              Resource = "/",
+
+              wsecli:start(Host, Port, Resource),
+
+              assert_that(meck:called(gen_tcp, send, '_'), is(true)),
+              meck:unload(gen_tcp),
+              wsecli:stop()
+          end),
+        describe("on successful handshake", fun() ->
+              it("should invoke on_open callback", fun() ->
+                    Host = "localhost",
+                    Port = 8080,
+                    Resource = "/",
+
+                    Pid = self(),
+                    wsecli:start(Host, Port, Resource),
+                    wsecli:on_open(fun() -> Pid ! on_open end),
+
+                    assert_that((fun() ->
+                          receive
+                            on_open ->
+                              true
+                          after 500 ->
+                              false
+                          end
+                      end)(), is(true)),
+                    wsecli:stop()
+                end)
+          end)
+    end).
