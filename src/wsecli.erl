@@ -3,13 +3,14 @@
 
 -include("wsecli.hrl").
 
--export([start/3, stop/0]).
+-export([start/3, stop/0, send/1]).
 -export([on_open/1]).
 -export([init/1, connecting/2, open/2, closing/2, closed/2]).
 -export([handle_event/3, handle_sync_event/4, handle_info/3, terminate/3, code_change/4]).
 
 -record(callbacks, {
-    on_open = fun()-> undefined end 
+    on_open = fun()-> undefined end,
+    on_error = fun(_Reason)-> undefined end
   }).
 -record(data, {
     socket :: gen_tcp:socket(),
@@ -25,6 +26,11 @@ start(Host, Port, Path)->
 -spec stop() -> ok.
 stop() ->
   gen_fsm:sync_send_all_state_event(wsecli, stop).
+
+-spec send(Data::string()) -> ok;
+          (Data::binary()) -> ok.
+send(Data) ->
+  gen_fsm:send_event(wsecli, {send, Data}).
 
 -spec on_open(Callback::fun()) -> any().
 on_open(Callback) ->
@@ -45,17 +51,26 @@ init({Host, Port, Resource}) ->
   {ok, connecting, #data{ socket = Socket, handshake = Handshake}}.
 
 -spec connecting({on_open, Callback::fun()}, StateData::#data{}) -> term();
-                (Event::term(), StateData::#data{}) -> term().
+                ({send, Data::binary()}, StateData::#data{}) -> term().
 connecting({on_open, Callback}, StateData) ->
   Callbacks = StateData#data.cb#callbacks{on_open = Callback},
   {next_state, connecting, StateData#data{cb = Callbacks}};
 
-connecting(Event, StateData) ->
-  connecting.
+connecting({send, _Data}, StateData) ->
+  (StateData#data.cb#callbacks.on_error)("Can't send data while in connecting state"),
+  {next_state, connecting, StateData}.
 
 -spec open(Event::term(), StateData::#data{}) -> term().
-open(Event, StateData) ->
-  open.
+open({send, Data}, StateData) ->
+  {ok, Frame} = wsecli_framing:frame(Data),
+  %case gen_tcp:send(StateData#data.socket, Frame) of
+  %  ok ->
+  %    ok;
+  %  {error, Reason} ->
+  %    (StateData#data.cb#callbacks.on_error)(Reason)
+  %end,
+  {next_state, open, StateData}.
+
 
 -spec closing(Event::term(), StateData::#data{}) -> term().
 closing(Event, StateData) ->

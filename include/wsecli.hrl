@@ -8,3 +8,5 @@
     version      :: integer(),
     message :: #http_message{}
   }).
+
+-record(frame, {}).
