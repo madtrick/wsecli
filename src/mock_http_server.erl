@@ -4,8 +4,23 @@
 
 -spec start(Tester::pid(), Port::integer()) -> true.
 start(Tester, Port) ->
-  {ok, Listen} = gen_tcp:listen(Port, [{reuseaddr, true}, {packet, raw}, binary]),
-  register(mock_http_server, spawn_link(fun() -> accept(Tester, Listen) end)).
+  Starter = self(),
+  register(mock_http_server, spawn(fun() -> start_link(Starter,Tester, Port) end)),
+  receive
+    started ->
+      ok
+  end.
+
+start_link(Starter, Tester, Port) ->
+  case gen_tcp:listen(Port, [{reuseaddr, true}, {packet, raw}, binary]) of
+    {ok, Listen} ->
+  Starter ! started,
+      accept(Tester, Listen);
+    {error, eaddrinuse} ->
+
+      timer:sleep(1000),
+      start_link(Starter, Tester, Port)
+  end.
 
 -spec stop() -> ok.
 stop() ->
@@ -22,7 +37,7 @@ accept(Tester, Listen) ->
     after 100 -> true
   end,
 
-  case gen_tcp:accept(Listen, 100) of
+  case gen_tcp:accept(Listen, 500) of
     {ok, Socket} ->
       loop(Tester, Socket);
     {error, timeout} ->
