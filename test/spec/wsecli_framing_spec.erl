@@ -97,16 +97,58 @@ spec() ->
                 end)
           end),
         describe("frame", fun() ->
-              describe("binary data", fun()->
-                    it("should set the opcode to BINARY")
+              describe("when no options are passed", fun() ->
+                    it("should unset fin", fun() ->
+                          Frame = wsecli_framing:frame("Foo bar"),
+                          assert_that(Frame#frame.fin, is(0))
+                      end),
+                    it("should set opcode to text on text data", fun()->
+                          Frame = wsecli_framing:frame("Foo bar"),
+                          assert_that(Frame#frame.opcode, is(1))
+                      end),
+                    it("should set opcode to binary on binary data", fun()->
+                          Frame = wsecli_framing:frame(<<"Foo bar">>),
+                          assert_that(Frame#frame.opcode, is(2))
+                      end)
                 end),
-              describe("text data", fun()->
-                    it("should set the FIN bit when the message is not fragmented", fun()->
-                          Data = "Foo bar",
-
-                          Frame = wsecli_framing:frame(Data),
+              describe("when options are passed", fun()->
+                    it("should set fin if fin option is present", fun()->
+                          Frame = wsecli_framing:frame("Foo bar", [fin]),
                           assert_that(Frame#frame.fin, is(1))
                       end),
+                    it("should set opcode to text if opcode option is text", fun()->
+                          Frame = wsecli_framing:frame("Foo bar", [{opcode, text}]),
+                          assert_that(Frame#frame.opcode, is(1))
+                      end),
+                    it("should set opcode to binary if opcode option is binary", fun()->
+                          Frame = wsecli_framing:frame("asdasdasd", [{opcode, binary}]),
+                          assert_that(Frame#frame.opcode, is(2))
+                      end),
+                    it("should set opcode to ping if opcode option is ping", fun()->
+                          Frame = wsecli_framing:frame("pinging", [{opcode, ping}]),
+                          assert_that(Frame#frame.opcode, is(9))
+                      end),
+                    it("should set opcode to pong if opcode option is pong", fun() ->
+                          Frame = wsecli_framing:frame("pingin", [{opcode, pong}]),
+                          assert_that(Frame#frame.opcode, is(10))
+                      end),
+                    it("should set opcode to close if opcode option is close", fun() ->
+                          % Notice that this is an invalid payload for a close frame
+                          Frame = wsecli_framing:frame("closing", [{opcode, close}]),
+                          assert_that(Frame#frame.opcode, is(8))
+                      end),
+                    it("should set opcode to continuation if opcode option is continuation", fun()->
+                          Frame = wsecli_framing:frame("Foo bar", [{opcode, continuation}]),
+                          assert_that(Frame#frame.opcode, is(0))
+                      end)
+                end),
+              describe("text data", fun()->
+                    %it("should set the FIN bit when the message is not fragmented", fun()->
+                    %      Data = "Foo bar",
+
+                    %      Frame = wsecli_framing:frame(Data),
+                    %      assert_that(Frame#frame.fin, is(1))
+                    %  end),
                     it("should leave the RSV bits unset", fun()->
                           Data = "Foo bar",
                           Frame = wsecli_framing:frame(Data),

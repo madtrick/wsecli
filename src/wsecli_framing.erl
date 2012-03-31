@@ -1,10 +1,14 @@
 -module(wsecli_framing).
 -include("wsecli.hrl").
 
--export([to_binary/1, frame/1, control_frame/1]).
+-export([to_binary/1, frame/1, frame/2, control_frame/1]).
 
+-define(OP_CODE_CONT, 0).
 -define(OP_CODE_TEXT, 1).
 -define(OP_CODE_BIN, 2).
+-define(OP_CODE_CLOSE, 8).
+-define(OP_CODE_PING, 9).
+-define(OP_CODE_PONG, 10).
 
 -spec to_binary(Frame::#frame{}) -> binary().
 to_binary(Frame) ->
@@ -26,54 +30,69 @@ extended_payload_len_bit_width(PayloadLen, Max) ->
     _ -> Max
   end.
 
--spec frame(Data::string()) -> {ok, #frame{}}.
+-spec frame(Data::binary() | string()) -> #frame{}.
+frame(Data) when is_binary(Data) ->
+  frame(Data, [{opcode, binary}]);
+
 frame(Data) when is_list(Data)->
-  BinData = list_to_binary(Data),
-  Frame = #frame{
-    fin = 1,
-    opcode = 1
-  },
-  Frame2 = length(Frame, BinData),
-  Frame3 = mask(Frame2, BinData),
-  Frame3.
+  frame(list_to_binary(Data), [{opcode, text}]).
+
+-spec frame(Data::string() | binary(), Options::list()) -> #frame{}.
+frame(Data, Options) when is_list(Data) ->
+  frame(list_to_binary(Data), Options);
+
+frame(Data, Options) ->
+  Frame = #frame{},
+  Frame2 = length(Frame, Data),
+  Frame3 = mask(Frame2, Data),
+  apply_options(Frame3, Options).
+
+-spec apply_options(Frame::#frame{}, Options::list()) -> #frame{}.
+apply_options(Frame, [fin | Tail]) ->
+  T = Frame#frame{fin = 1},
+  apply_options(T, Tail);
+
+apply_options(Frame, [{opcode, continuation} | Tail]) ->
+  T = Frame#frame{opcode = ?OP_CODE_CONT},
+  apply_options(T, Tail);
+
+apply_options(Frame, [{opcode, text} | Tail]) ->
+  T = Frame#frame{opcode = ?OP_CODE_TEXT},
+  apply_options(T, Tail);
+
+apply_options(Frame, [{opcode, binary} | Tail]) ->
+  T = Frame#frame{opcode = ?OP_CODE_BIN},
+  apply_options(T, Tail);
+
+apply_options(Frame, [{opcode, close} | Tail]) ->
+  T = Frame#frame{opcode = ?OP_CODE_CLOSE},
+  apply_options(T, Tail);
+
+apply_options(Frame, [{opcode, ping} | Tail]) ->
+  T = Frame#frame{opcode = ?OP_CODE_PING},
+  apply_options(T, Tail);
+
+apply_options(Frame, [{opcode, pong} | Tail]) ->
+  T = Frame#frame{opcode = ?OP_CODE_PONG},
+  apply_options(T, Tail);
+
+apply_options(Frame, []) ->
+  Frame.
 
 -spec control_frame({close, Code::integer(), Reason::string()}) -> #frame{};
                   ({ping, Reason::string()}) -> #frame{};
                   ({pong, Reason::string()}) -> #frame{}.
 control_frame({close, Code, Reason}) ->
-  %TODO: enforce that Reason + Code is <= than 125 bytes
-  Frame = #frame{
-    fin = 1,
-    opcode = 8
-  },
-
+  %%TODO: enforce that Reason + Code is <= than 125 bytes
   BinReason = list_to_binary(Reason),
   Data = <<Code:16, BinReason/binary>>,
-  Frame2 = length(Frame, Data),
-  Frame3 = mask(Frame2, Data),
-  Frame3;
+  frame(Data, [fin, {opcode, close}]);
 
 control_frame({pong, Reason}) ->
-  Frame = #frame{
-    fin = 1,
-    opcode = 10
-  },
-
-  BinReason = list_to_binary(Reason),
-  Frame2 = length(Frame, BinReason),
-  Frame3 = mask(Frame2, BinReason),
-  Frame3;
+  frame(Reason, [fin, {opcode, pong}]);
 
 control_frame({ping, Reason}) ->
-  Frame = #frame{
-    fin = 1,
-    opcode = 9
-  },
-
-  BinReason = list_to_binary(Reason),
-  Frame2 = length(Frame, BinReason),
-  Frame3 = mask(Frame2, BinReason),
-  Frame3.
+  frame(Reason, [fin, {opcode, ping}]).
 
 -spec op_code( Data ::binary() | string()) -> pos_integer().
 op_code(Data) when is_binary(Data) ->
