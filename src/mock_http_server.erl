@@ -1,66 +1,79 @@
 -module(mock_http_server).
+-behaviour(gen_server).
 
+%-export([start/2, stop/0]).
 -export([start/2, stop/0]).
+-export([init/1, handle_cast/2, handle_call/3, handle_info/2, terminate/2, code_change/3]).
+-export([accept_loop/1]).
 
--spec start(Tester::pid(), Port::integer()) -> true.
-start(Tester, Port) ->
-  Starter = self(),
-  register(mock_http_server, spawn(fun() -> start_link(Starter,Tester, Port) end)),
-  receive
-    started ->
-      ok
-  end.
+-record(state, {
+    socket,
+    test_process,
+    handshaked
+  }).
 
-start_link(Starter, Tester, Port) ->
-  case gen_tcp:listen(Port, [{reuseaddr, true}, {packet, raw}, binary]) of
-    {ok, Listen} ->
-  Starter ! started,
-      accept(Tester, Listen);
-    {error, eaddrinuse} ->
+start(TestProcess, Port)->
+  gen_server:start({local, mock_http_server}, ?MODULE, [TestProcess, Port], []).
 
-      timer:sleep(1000),
-      start_link(Starter, Tester, Port)
-  end.
+stop()->
+  gen_server:call(mock_http_server, stop).
 
--spec stop() -> ok.
-stop() ->
-  mock_http_server ! {stop, self()},
-  receive
-    stopped ->
-      ok
-  end.
+init([TestProcess, Port]) ->
+  {ok, Socket} = gen_tcp:listen(Port, [{reuseaddr, true}, {packet, raw}, binary]),
+  accept(Socket),
+  {ok, #state{socket = Socket, test_process = TestProcess, handshaked = false}}.
 
-accept(Tester, Listen) ->
-  receive
-    {stop, From} ->
-      stop(Listen, From)
-    after 100 -> true
-  end,
 
-  case gen_tcp:accept(Listen, 500) of
-    {ok, Socket} ->
-      loop(Tester, Socket);
-    {error, timeout} ->
-      accept(Tester, Listen)
-  end.
+accept(Socket) ->
+  spawn(?MODULE, accept_loop, [Socket]).
 
-loop(Tester, Socket) ->
-  receive
-    {stop, From} ->
-      stop(Socket, From);
-    {tcp, Socket, Data} ->
-      handshake(Tester, Socket, Data),
-      loop(Tester, Socket)
-  end.
+accept_loop(LSocket) ->
+  error_logger:info_msg("Acceptin \n"),
+  {ok, Socket} = gen_tcp:accept(LSocket),
+  error_logger:info_msg("Accepted \n"),
+  gen_tcp:controlling_process(Socket, whereis(mock_http_server)),
+  gen_server:cast(mock_http_server, accepted).
 
-handshake(Tester, Socket, Data) ->
+handle_cast(accepted, State) ->
+  {noreply, State}.
+
+handle_info({tcp, _Socket, Data}, State) ->
+  case State#state.handshaked  of
+    true ->
+      receive_data(Data),
+      {noreply, State};
+    false ->
+      handshake(Data, State),
+      {noreply, State#state{handshaked = true}}
+  end;
+
+
+handle_info(_Msg, Library) -> {noreply, Library}.
+
+handle_call(stop, _, State) ->
+  {stop, normal, exit, State};
+
+handle_call(_Msg, _Caller, State) -> {noreply, State}.
+
+terminate(_, State) ->
+  gen_tcp:close(State#state.socket).
+
+code_change(_OldVersion, Library, _Extra) -> {ok, Library}.
+
+%
+% Internal
+%
+receive_data(_Data) ->
+  ok.
+handshake(Data, State) ->
+
   {ok, {http_request, Method, Uri, Version}, Rest} = erlang:decode_packet(http, Data, []),
 
   Headers = headers(Rest, []),
   Request = {request, [{method, Method}, {uri, Uri}, {version, Version}], headers, Headers},
   BinaryClientKey = list_to_binary(get_header_value("sec-websocket-key", Headers)),
 
-  Tester ! Request,
+  State#state.test_process ! Request,
   HandShake = [
     "HTTP/1.1 101 Web Socket Protocol Handshake\r\n",
     "Upgrade: WebSocket\r\n",
@@ -69,7 +82,7 @@ handshake(Tester, Socket, Data) ->
     base64:encode_to_string(crypto:sha(<<BinaryClientKey/binary, "258EAFA5-E914-47DA-95CA-C5AB0DC85B11">>)),
     "\r\n\r\n"
   ],
-  gen_tcp:send(Socket, HandShake).
+  gen_tcp:send(State#state.socket, HandShake).
 
 headers(Packet, Acc) ->
   F = fun(S) when is_atom(S)-> atom_to_list(S);
@@ -82,10 +95,6 @@ headers(Packet, Acc) ->
       Acc
   end.
 
-stop(Socket, From)->
-  gen_tcp:close(Socket),
-  From ! stopped,
-  exit(normal).
 
 get_header_value(Key, Headers) ->
   proplists:get_value(Key, Headers).
