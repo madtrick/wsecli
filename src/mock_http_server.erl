@@ -21,21 +21,21 @@ stop()->
 init([TestProcess, Port]) ->
   {ok, Socket} = gen_tcp:listen(Port, [{reuseaddr, true}, {packet, raw}, binary]),
   accept(Socket),
-  {ok, #state{socket = Socket, test_process = TestProcess, handshaked = false}}.
+  NewState = #state{socket = Socket, test_process = TestProcess, handshaked = false},
+  {ok, NewState}.
 
 
 accept(Socket) ->
   spawn(?MODULE, accept_loop, [Socket]).
 
 accept_loop(LSocket) ->
-  error_logger:info_msg("Acceptin \n"),
   {ok, Socket} = gen_tcp:accept(LSocket),
-  error_logger:info_msg("Accepted \n"),
   gen_tcp:controlling_process(Socket, whereis(mock_http_server)),
-  gen_server:cast(mock_http_server, accepted).
+  gen_server:cast(mock_http_server, {accepted, Socket}).
 
-handle_cast(accepted, State) ->
-  {noreply, State}.
+handle_cast({accepted, Socket}, State) ->
+  NewState = State#state{socket = Socket},
+  {noreply, NewState}.
 
 handle_info({tcp, _Socket, Data}, State) ->
   case State#state.handshaked  of
@@ -44,7 +44,8 @@ handle_info({tcp, _Socket, Data}, State) ->
       {noreply, State};
     false ->
       handshake(Data, State),
-      {noreply, State#state{handshaked = true}}
+      NewState = State#state{handshaked = true},
+      {noreply, NewState}
   end;
 
 
@@ -73,7 +74,7 @@ handshake(Data, State) ->
   Request = {request, [{method, Method}, {uri, Uri}, {version, Version}], headers, Headers},
   BinaryClientKey = list_to_binary(get_header_value("sec-websocket-key", Headers)),
 
-  State#state.test_process ! Request,
+  %State#state.test_process ! Request,
   HandShake = [
     "HTTP/1.1 101 Web Socket Protocol Handshake\r\n",
     "Upgrade: WebSocket\r\n",
