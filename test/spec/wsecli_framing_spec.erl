@@ -17,8 +17,8 @@ spec() ->
                           <<
                           Fin:1,
                           Rsv1:1, Rsv2:1, Rsv3:1,
-                          Mask:1,
                           Opcode:4,
+                          Mask:1,
                           PayloadLen:7,
                           MaskingKey:32,
                           Payload/binary
@@ -45,8 +45,8 @@ spec() ->
                           <<
                           Fin:1,
                           Rsv1:1, Rsv2:1, Rsv3:1,
-                          Mask:1,
                           Opcode:4,
+                          Mask:1,
                           PayloadLen:7,
                           ExtendedPayloadLen:16,
                           MaskingKey:32,
@@ -75,8 +75,8 @@ spec() ->
                           <<
                           Fin:1,
                           Rsv1:1, Rsv2:1, Rsv3:1,
-                          Mask:1,
                           Opcode:4,
+                          Mask:1,
                           PayloadLen:7,
                           ExtendedPayloadLen:64,
                           MaskingKey:32,

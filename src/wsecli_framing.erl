@@ -15,8 +15,8 @@ to_binary(Frame) ->
   <<
     (Frame#frame.fin):1,
     (Frame#frame.rsv1):1, (Frame#frame.rsv2):1, (Frame#frame.rsv3):1,
-    (Frame#frame.mask):1,
     (Frame#frame.opcode):4,
+    (Frame#frame.mask):1,
     (Frame#frame.payload_len):7,
     (Frame#frame.extended_payload_len):(extended_payload_len_bit_width(Frame#frame.extended_payload_len, 16)),
     (Frame#frame.extended_payload_len_cont):(extended_payload_len_bit_width(Frame#frame.extended_payload_len_cont, 64)),
