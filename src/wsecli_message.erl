@@ -14,25 +14,22 @@ encode(Data, Type)->
 
 -spec encode(Data::binary(), Type :: atom(), Acc ::list()) -> list().
 encode(<<Data:?FRAGMENT_SIZE/binary>>, Type, Acc) ->
-  Frame = wsecli_framing:frame(Data, [fin, {opcode, Type}]),
-  BinFrame = wsecli_framing:to_binary(Frame),
-  [BinFrame | Acc];
+  [frame(Data, [fin, {opcode, Type}]) | Acc];
 
 encode(<<Data:?FRAGMENT_SIZE/binary, Rest/binary>>, Type, []) ->
-  Frame = wsecli_framing:frame(Data, [{opcode, Type}]),
-  BinFrame = wsecli_framing:to_binary(Frame),
-  encode(Rest, continuation, [BinFrame | []]);
+  encode(Rest, continuation, [frame(Data, [{opcode, Type}]) | []]);
 
 encode(<<Data:?FRAGMENT_SIZE/binary, Rest/binary>>, Type, Acc) ->
-  Frame = wsecli_framing:frame(Data, [{opcode, Type}]),
-  BinFrame = wsecli_framing:to_binary(Frame),
-  encode(Rest, Type, [BinFrame | Acc]);
+  encode(Rest, Type, [frame(Data, [{opcode, Type}]) | Acc]);
 
 encode(<<>>, _Type, Acc) ->
   Acc;
 
 encode(<<Data/binary>>, Type, Acc) ->
-  Frame = wsecli_framing:frame(Data, [fin, {opcode, Type}]),
-  BinFrame = wsecli_framing:to_binary(Frame),
-  [BinFrame | Acc].
+  [frame(Data, [fin, {opcode, Type}]) | Acc].
+
+-spec frame(Data::binary(), Options::list()) -> binary().
+frame(Data, Options) ->
+  Frame = wsecli_framing:frame(Data, Options),
+  wsecli_framing:to_binary(Frame).
 
