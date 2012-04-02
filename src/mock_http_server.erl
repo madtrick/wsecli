@@ -30,7 +30,7 @@ accept(Socket) ->
 
 accept_loop(LSocket) ->
   {ok, Socket} = gen_tcp:accept(LSocket),
-  gen_tcp:controlling_process(Socket, whereis(mock_http_server)),
+  ok = gen_tcp:controlling_process(Socket, whereis(mock_http_server)),
   gen_server:cast(mock_http_server, {accepted, Socket}).
 
 handle_cast({accepted, Socket}, State) ->
@@ -40,7 +40,7 @@ handle_cast({accepted, Socket}, State) ->
 handle_info({tcp, _Socket, Data}, State) ->
   case State#state.handshaked  of
     true ->
-      receive_data(Data),
+      receive_data(State#state.test_process, Data),
       {noreply, State};
     false ->
       handshake(Data, State),
@@ -64,7 +64,8 @@ code_change(_OldVersion, Library, _Extra) -> {ok, Library}.
 %
 % Internal
 %
-receive_data(_Data) ->
+receive_data(TestProcess, _Data) ->
+  TestProcess ! {mock_http_server, received_data},
   ok.
 handshake(Data, State) ->
 

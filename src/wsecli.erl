@@ -4,7 +4,7 @@
 -include("wsecli.hrl").
 
 -export([start/3, stop/0, send/1]).
--export([on_open/1]).
+-export([on_open/1, on_error/1]).
 -export([init/1, connecting/2, open/2, closing/2, closed/2]).
 -export([handle_event/3, handle_sync_event/4, handle_info/3, terminate/3, code_change/4]).
 
@@ -36,6 +36,9 @@ send(Data) ->
 on_open(Callback) ->
   gen_fsm:send_event(wsecli, {on_open, Callback}).
 
+-spec on_error(Callback::fun()) -> any().
+on_error(Callback) ->
+  gen_fsm:send_all_state_event(wsecli, {on_error, Callback}).
 
 %
 % GEN_FSM behaviour functions
@@ -62,13 +65,13 @@ connecting({send, _Data}, StateData) ->
 
 -spec open(Event::term(), StateData::#data{}) -> term().
 open({send, Data}, StateData) ->
-  {ok, Frame} = wsecli_framing:frame(Data),
-  %case gen_tcp:send(StateData#data.socket, Frame) of
-  %  ok ->
-  %    ok;
-  %  {error, Reason} ->
-  %    (StateData#data.cb#callbacks.on_error)(Reason)
-  %end,
+  Message = wsecli_message:encode(Data, text),
+  case gen_tcp:send(StateData#data.socket, Message) of
+    ok ->
+      ok;
+    {error, Reason} ->
+      (StateData#data.cb#callbacks.on_error)(Reason)
+  end,
   {next_state, open, StateData}.
 
 
@@ -83,6 +86,10 @@ closed(Event, StateData) ->
 %
 % GEN_FSM behaviour callbacks
 %
+handle_event({on_error, Callback}, StateName, StateData) ->
+  Callbacks = StateData#data.cb#callbacks{on_error = Callback},
+  {next_state, StateName, StateData#data{cb = Callbacks} };
+
 handle_event(Event, StateName, StateData) ->
   handl_event.
 
@@ -98,7 +105,7 @@ handle_info({tcp, Socket, Data}, connecting, StateData) ->
   Response = wsecli_http:from_response(Data),
   case wsecli_handshake:validate(Response, StateData#data.handshake) of
     true ->
-      (StateData#data.cb#callbacks.on_open)(),
+      spawn(StateData#data.cb#callbacks.on_open),
       {next_state, open, StateData};
     false ->
       {stop, failed_handshake, StateData}

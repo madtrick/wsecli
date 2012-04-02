@@ -63,23 +63,38 @@ spec() ->
             end)
       end),
     describe("send", fun() ->
-          it("should frame data", fun() ->
-                meck:new(wsecli_framing, [passthrough]),
+          it("should send data as messages", fun() ->
+                meck:new(wsecli_message, [passthrough]),
+                meck:new(gen_tcp, [passthrough, unstick]),
 
-                Pid = self(),
                 wsecli:start("localhost", 8080, "/"),
                 wsecli:on_open(fun() ->
-                      wsecli:send("la casa de la pradera"),
-                      Pid ! message_sent
+                      wsecli:send("la casa de la pradera")
                   end),
 
-                receive message_sent -> ok end,
+                receive {mock_http_server, received_data} -> ok end,
 
-                assert_that(meck:called(wsecli_framing, frame, '_'), is(true)),
+                assert_that(meck:called(gen_tcp, send, '_'), is(true)),
+                assert_that(meck:called(wsecli_message, encode, '_'), is(true)),
                 wsecli:stop(),
-                meck:unload(wsecli_framing)
+                meck:unload([gen_tcp, wsecli_message])
             end),
-          it("should buffer data while not connected"),
+          it("should invoke on_error callback if not on open state", fun() ->
+                Pid = self(),
+                wsecli:start("localhost", 8080, "/"),
+                wsecli:on_error(fun(_Reason) -> Pid ! {Pid, on_error} end),
+                wsecli:send("La casa de la pradera"),
+
+                assert_that((fun() ->
+                        receive
+                          {Pid, on_error} ->
+                            true
+                        after 500 ->
+                            false
+                        end
+                    end)(), is(true)),
+                wsecli:stop()
+            end),
           it("should invoke on_error if not connected")
       end)
     end).

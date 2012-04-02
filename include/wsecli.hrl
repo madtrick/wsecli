@@ -12,7 +12,7 @@
 -type bit() :: 0..1.
 
 -record(frame, {
-    fin :: bit(),
+    fin = 0:: bit(),
     rsv1 = 0 :: bit(),
     rsv2 = 0 :: bit(),
     rsv3 = 0 :: bit(),
