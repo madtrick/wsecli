@@ -1,7 +1,7 @@
 -module(wsecli_framing).
 -include("wsecli.hrl").
 
--export([to_binary/1, frame/1, frame/2, control_frame/1]).
+-export([to_binary/1, from_binary/1, frame/1, frame/2, control_frame/1]).
 
 -define(OP_CODE_CONT, 0).
 -define(OP_CODE_TEXT, 1).
@@ -23,6 +23,75 @@ to_binary(Frame) ->
     (Frame#frame.masking_key):32,
     (Frame#frame.payload)/binary
   >>.
+
+-spec from_binary(Data::binary()) -> list(#frame{}).
+from_binary(Data) ->
+  lists:reverse(from_binary(Data, [])).
+
+from_binary(<<Head:9, 126:7, PayloadLen:16, Payload:PayloadLen/binary, Rest/binary>>, Acc)->
+  from_binary(Rest, [decode_frame(<<Head:9, 126:7, PayloadLen:16, Payload/binary>>) | Acc]);
+
+from_binary(<<Head:9, 127:7, PayloadLen:64, Payload:PayloadLen/binary, Rest/binary>>, Acc)->
+  from_binary(Rest, [decode_frame(<<Head:9, 127:7, PayloadLen:64, Payload/binary>>) | Acc]);
+
+from_binary(<<Head:9, PayloadLen:7, Payload:PayloadLen/binary, Rest/binary>>, Acc) ->
+  from_binary(Rest, [decode_frame(<<Head:9, PayloadLen:7, Payload/binary>>) | Acc]);
+
+from_binary(<<>>, Acc) ->
+  Acc.
+
+decode_frame(Data) ->
+  % TODO: ensure that Mask is not set
+  <<
+    Fin:1,
+    Rsv1:1, Rsv2:1, Rsv3:1,
+    Opcode:4,
+    Mask:1,
+    _/bits
+  >> = Data,
+
+  Frame = #frame{
+    fin = Fin,
+    rsv1 = Rsv1, rsv2 = Rsv2, rsv3 = Rsv3,
+    opcode = Opcode,
+    mask = Mask
+  },
+
+  Frame2 = binary_payload_length(Data, Frame),
+  binary_payload(Data, Frame2).
+
+-spec binary_payload_length(Data::binary(), Frame::#frame{}) -> #frame{}.
+binary_payload_length(Data, Frame) ->
+  <<_:9, PayloadLen:7, _/binary>> = Data,
+  case PayloadLen of
+    126 ->
+      <<_:16, ExtendedPayloadLen:16, _/binary>> = Data,
+      Frame#frame{payload_len = PayloadLen, extended_payload_len = ExtendedPayloadLen};
+    127 ->
+      <<_:16, ExtendedPayloadLenCont:64, _/binary>> = Data,
+      Frame#frame{payload_len = PayloadLen, extended_payload_len_cont = ExtendedPayloadLenCont};
+    _ ->
+      Frame#frame{payload_len = PayloadLen}
+  end.
+
+-spec binary_payload(Data::binary(), Frame::#frame{}) -> #frame{}.
+binary_payload(Data, Frame) ->
+  case Frame#frame.payload_len of
+    126 ->
+      <<_:32, Payload/binary>> = Data;
+    127 ->
+      <<_:80, Payload/binary>> = Data;
+    _ ->
+      <<_:16, Payload/binary>> = Data
+  end,
+
+  case Frame#frame.opcode of
+    ?OP_CODE_TEXT ->
+      Frame#frame{ payload = Payload };
+    ?OP_CODE_CONT ->
+      Frame#frame{ payload = Payload }
+  end.
+
 
 extended_payload_len_bit_width(PayloadLen, Max) ->
   case PayloadLen of

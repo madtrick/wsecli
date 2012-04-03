@@ -98,7 +98,40 @@ spec() ->
           end),
         describe("from_binary", fun() ->
               describe("when binary is composed from various frames", fun() ->
-                    it("should return a list of frame records")
+                    it("should return a list of frame records", fun() ->
+                          Text1 = "Jankle jankle",
+                          Payload1 = list_to_binary(Text1),
+                          PayloadLen1 = byte_size(Payload1),
+
+                          Text2 = "Pasa pra casa",
+                          Payload2 = list_to_binary(Text2),
+                          PayloadLen2 = byte_size(Payload2),
+
+                          BinFrame1 = get_binary_frame(0, 0, 0, 0, 1, 0, PayloadLen1, 0, Payload1),
+                          BinFrame2 = get_binary_frame(1, 0, 0, 0, 0, 0, PayloadLen2, 0, Payload2),
+
+                          BinFrames = <<BinFrame1/binary, BinFrame2/binary>>,
+
+                          [Frame1, Frame2] = wsecli_framing:from_binary(BinFrames),
+
+                          assert_that(Frame1#frame.fin, is(0)),
+                          assert_that(Frame1#frame.rsv1, is(0)),
+                          assert_that(Frame1#frame.rsv2, is(0)),
+                          assert_that(Frame1#frame.rsv3, is(0)),
+                          assert_that(Frame1#frame.opcode, is(1)),
+                          assert_that(Frame1#frame.mask, is(0)),
+                          assert_that(Frame1#frame.payload_len, is(PayloadLen1)),
+                          assert_that(Frame1#frame.payload, is(Payload1)),
+
+                          assert_that(Frame2#frame.fin, is(1)),
+                          assert_that(Frame2#frame.rsv1, is(0)),
+                          assert_that(Frame2#frame.rsv2, is(0)),
+                          assert_that(Frame2#frame.rsv3, is(0)),
+                          assert_that(Frame2#frame.opcode, is(0)),
+                          assert_that(Frame2#frame.mask, is(0)),
+                          assert_that(Frame2#frame.payload_len, is(PayloadLen2)),
+                          assert_that(Frame2#frame.payload, is(Payload2))
+                      end)
                 end),
               describe("when payload length <= 125", fun()->
                     it("should return a frame record", fun() ->
@@ -108,7 +141,7 @@ spec() ->
 
                           BinFrame = get_binary_frame(1, 0, 0, 0, 1, 0, PayloadLen, 0, Payload),
 
-                          Frame = wsecli_framing:from_binary(BinFrame),
+                          [Frame] = wsecli_framing:from_binary(BinFrame),
 
                           assert_that(Frame#frame.fin, is(1)),
                           assert_that(Frame#frame.rsv1, is(0)),
@@ -117,7 +150,7 @@ spec() ->
                           assert_that(Frame#frame.opcode, is(1)),
                           assert_that(Frame#frame.mask, is(0)),
                           assert_that(Frame#frame.payload_len, is(PayloadLen)),
-                          assert_that(Frame#frame.payload, is(Text))
+                          assert_that(Frame#frame.payload, is(Payload))
                       end)
                 end),
               describe("when payload length > 125 and <= 65536", fun()->
@@ -129,7 +162,7 @@ spec() ->
 
                           BinFrame = get_binary_frame(1, 0, 0, 0, 1, 0, PayloadLen, ExtendedPayloadLen, Payload),
 
-                          Frame = wsecli_framing:from_binary(BinFrame),
+                          [Frame] = wsecli_framing:from_binary(BinFrame),
 
                           assert_that(Frame#frame.fin, is(1)),
                           assert_that(Frame#frame.rsv1, is(0)),
@@ -139,7 +172,7 @@ spec() ->
                           assert_that(Frame#frame.mask, is(0)),
                           assert_that(Frame#frame.payload_len, is(126)),
                           assert_that(Frame#frame.extended_payload_len, is(ExtendedPayloadLen)),
-                          assert_that(Frame#frame.payload, is(Data))
+                          assert_that(Frame#frame.payload, is(Payload))
                       end)
                 end),
               describe("when payload length > 65536", fun()->
@@ -151,7 +184,7 @@ spec() ->
 
                           BinFrame = get_binary_frame(1, 0, 0, 0, 1, 0, PayloadLen, ExtendedPayloadLenCont, Payload),
 
-                          Frame = wsecli_framing:from_binary(BinFrame),
+                          [Frame] = wsecli_framing:from_binary(BinFrame),
 
                           assert_that(Frame#frame.fin, is(1)),
                           assert_that(Frame#frame.rsv1, is(0)),
@@ -161,7 +194,7 @@ spec() ->
                           assert_that(Frame#frame.mask, is(0)),
                           assert_that(Frame#frame.payload_len, is(127)),
                           assert_that(Frame#frame.extended_payload_len_cont, is(ExtendedPayloadLenCont)),
-                          assert_that(Frame#frame.payload, is(Data))
+                          assert_that(Frame#frame.payload, is(Payload))
                       end)
                 end)
           end),
