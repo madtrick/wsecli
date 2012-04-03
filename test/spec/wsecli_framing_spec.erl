@@ -7,7 +7,7 @@
 spec() ->
   describe("wsecli_framing", fun()->
         describe("to_binary", fun() ->
-              describe("payload leng <= 125", fun()->
+              describe("payload length <= 125", fun()->
                     it("should return a binary representation of a frame", fun()->
                           Data = "Foo bar",
 
@@ -65,7 +65,7 @@ spec() ->
                           assert_that(Payload, is(Frame#frame.payload))
                       end)
                 end),
-              describe("payloa length > 65536", fun() ->
+              describe("payload length > 65536", fun() ->
                     it("should return a binary representation of a frame", fun()->
                           Data = get_random_string(78000),
 
@@ -93,6 +93,75 @@ spec() ->
                           assert_that(ExtendedPayloadLen, is(Frame#frame.extended_payload_len_cont)),
                           assert_that(MaskingKey, is(Frame#frame.masking_key)),
                           assert_that(Payload, is(Frame#frame.payload))
+                      end)
+                end)
+          end),
+        describe("from_binary", fun() ->
+              describe("when binary is composed from various frames", fun() ->
+                    it("should return a list of frame records")
+                end),
+              describe("when payload length <= 125", fun()->
+                    it("should return a frame record", fun() ->
+                          Text = "Jankle jankle",
+                          Payload = list_to_binary(Text),
+                          PayloadLen = byte_size(Payload),
+
+                          BinFrame = get_binary_frame(1, 0, 0, 0, 1, 0, PayloadLen, 0, Payload),
+
+                          Frame = wsecli_framing:from_binary(BinFrame),
+
+                          assert_that(Frame#frame.fin, is(1)),
+                          assert_that(Frame#frame.rsv1, is(0)),
+                          assert_that(Frame#frame.rsv2, is(0)),
+                          assert_that(Frame#frame.rsv3, is(0)),
+                          assert_that(Frame#frame.opcode, is(1)),
+                          assert_that(Frame#frame.mask, is(0)),
+                          assert_that(Frame#frame.payload_len, is(PayloadLen)),
+                          assert_that(Frame#frame.payload, is(Text))
+                      end)
+                end),
+              describe("when payload length > 125 and <= 65536", fun()->
+                    it("should return a frame record", fun() ->
+                          Data = get_random_string(4096),
+                          Payload = list_to_binary(Data),
+                          PayloadLen = 126,
+                          ExtendedPayloadLen = byte_size(Payload),
+
+                          BinFrame = get_binary_frame(1, 0, 0, 0, 1, 0, PayloadLen, ExtendedPayloadLen, Payload),
+
+                          Frame = wsecli_framing:from_binary(BinFrame),
+
+                          assert_that(Frame#frame.fin, is(1)),
+                          assert_that(Frame#frame.rsv1, is(0)),
+                          assert_that(Frame#frame.rsv2, is(0)),
+                          assert_that(Frame#frame.rsv3, is(0)),
+                          assert_that(Frame#frame.opcode, is(1)),
+                          assert_that(Frame#frame.mask, is(0)),
+                          assert_that(Frame#frame.payload_len, is(126)),
+                          assert_that(Frame#frame.extended_payload_len, is(ExtendedPayloadLen)),
+                          assert_that(Frame#frame.payload, is(Data))
+                      end)
+                end),
+              describe("when payload length > 65536", fun()->
+                    it("should return a frame record", fun() ->
+                          Data = get_random_string(70000),
+                          Payload = list_to_binary(Data),
+                          PayloadLen = 127,
+                          ExtendedPayloadLenCont = byte_size(Payload),
+
+                          BinFrame = get_binary_frame(1, 0, 0, 0, 1, 0, PayloadLen, ExtendedPayloadLenCont, Payload),
+
+                          Frame = wsecli_framing:from_binary(BinFrame),
+
+                          assert_that(Frame#frame.fin, is(1)),
+                          assert_that(Frame#frame.rsv1, is(0)),
+                          assert_that(Frame#frame.rsv2, is(0)),
+                          assert_that(Frame#frame.rsv3, is(0)),
+                          assert_that(Frame#frame.opcode, is(1)),
+                          assert_that(Frame#frame.mask, is(0)),
+                          assert_that(Frame#frame.payload_len, is(127)),
+                          assert_that(Frame#frame.extended_payload_len_cont, is(ExtendedPayloadLenCont)),
+                          assert_that(Frame#frame.payload, is(Data))
                       end)
                 end)
           end),
@@ -294,6 +363,18 @@ spec() ->
               it("should fragmen messages")
           end)
     end).
+
+get_binary_frame(Fin, Rsv1, Rsv2, Rsv3, Opcode, Mask, Length, ExtendedPayloadLength, Payload) ->
+  Head = <<Fin:1, Rsv1:1, Rsv2:1, Rsv3:1, Opcode:4, Mask:1, Length:7>>,
+
+  case Length of
+    126 ->
+      <<Head/binary, ExtendedPayloadLength:16, Payload/binary>>;
+    127 ->
+      <<Head/binary, ExtendedPayloadLength:64, Payload/binary>>;
+    _ ->
+      <<Head/binary, Payload/binary>>
+  end.
 
 get_random_string(Length) ->
   AllowedChars = "qwertyQWERTY1234567890",

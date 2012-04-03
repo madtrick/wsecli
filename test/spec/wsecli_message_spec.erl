@@ -113,5 +113,22 @@ spec() ->
     end),
   it("wsecli_message:control"),
   describe("decode", fun()->
-        it("decodes a message")
+        describe("unfragmented messages", fun()->
+              it("shit")
+              %it("decodes a text message", fun() ->
+              %      Payload = "Iepa yei!",
+
+              %      Fin = 1,
+              %      Rsv = 0,
+              %      Opcode = 1, %Text
+              %      Mask = 0,
+              %      PayloadLength = length(Payload),
+              %      PayloadData = list_to_binary(Payload),
+
+              %      FakeMessage =
+              %        <<Fin:1, Rsv:3, Opcode:4, Mask:1, PayloadLength:7, PayloadData/bits>>,
+
+              %      assert_that(wsecli_message:decode(FakeMessage), is({text, Payload}))
+              %  end)
+          end)
       end).
