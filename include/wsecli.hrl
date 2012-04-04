@@ -23,3 +23,9 @@
     extended_payload_len_cont :: integer(),
     masking_key :: binary(),
     payload :: binary()}).
+
+-record(message, {
+    frames = [] :: list(#frame{}),
+    payload :: string() | binary(), % FALSE!!! what about control message with code + message
+    type :: {text, binary, control, fragmented}
+  }).

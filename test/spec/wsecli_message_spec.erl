@@ -113,22 +113,207 @@ spec() ->
     end),
   it("wsecli_message:control"),
   describe("decode", fun()->
+        describe("fragmented messages", fun() ->
+              it("should complain when control messages are fragmented"),
+              it("should return a fragmented message with undefined payload when message is not complete", fun() ->
+                    Payload = crypto:rand_bytes(20),
+                    <<
+                    Payload1:10/binary,
+                    Payload2:5/binary,
+                    _Payload3/binary
+                    >> = Payload,
+
+                    FakeFragment1 = get_binary_frame(0, 0, 0, 0, 2, 0, 10, 0, Payload1),
+                    FakeFragment2 = get_binary_frame(0, 0, 0, 0, 0, 0, 5, 0, Payload2),
+
+                    Data = <<FakeFragment1/binary, FakeFragment2/binary>>,
+
+                    [Message] = wsecli_message:decode(Data),
+
+                    assert_that(Message#message.type, is(fragmented)),
+                    assert_that(length(Message#message.frames), is(2))
+                end),
+              it("should decode data containing a complete fragmented binary message", fun() ->
+                    Payload = crypto:rand_bytes(40),
+                    <<
+                    Payload1:10/binary,
+                    Payload2:10/binary,
+                    Payload3:10/binary,
+                    Payload4:10/binary
+                    >> = Payload,
+
+                    FakeFragment1 = get_binary_frame(0, 0, 0, 0, 2, 0, 10, 0, Payload1),
+                    FakeFragment2 = get_binary_frame(0, 0, 0, 0, 0, 0, 10, 0, Payload2),
+                    FakeFragment3 = get_binary_frame(0, 0, 0, 0, 0, 0, 10, 0, Payload3),
+                    FakeFragment4 = get_binary_frame(1, 0, 0, 0, 0, 0, 10, 0, Payload4),
+
+                    Data = << FakeFragment1/binary, FakeFragment2/binary, FakeFragment3/binary, FakeFragment4/binary>>,
+
+                    [Message] = wsecli_message:decode(Data),
+
+                    assert_that(Message#message.type, is(binary)),
+                    assert_that(Message#message.payload, is(Payload))
+                end),
+              it("should decode data containing a complete fragmented text message", fun() ->
+                    Text = "asasdasdasdasdasdasdasdasdasdasdasdasdasdasdasd",
+                    Payload = list_to_binary(Text),
+                    <<
+                    Payload1:5/binary,
+                    Payload2:2/binary,
+                    Payload3/binary
+                    >> = Payload,
+
+                    FakeFragment1 = get_binary_frame(0, 0, 0, 0, 1, 0, byte_size(Payload1), 0, Payload1),
+                    FakeFragment2 = get_binary_frame(0, 0, 0, 0, 0, 0, byte_size(Payload2), 0, Payload2),
+                    FakeFragment3 = get_binary_frame(1, 0, 0, 0, 0, 0, byte_size(Payload3), 0, Payload3),
+
+                    Data = << FakeFragment1/binary, FakeFragment2/binary, FakeFragment3/binary>>,
+
+                    [Message] = wsecli_message:decode(Data),
+
+                    assert_that(Message#message.type, is(text)),
+                    assert_that(Message#message.payload, is(Text))
+                end),
+              it("should complete a fragmented message", fun() ->
+                    Payload = crypto:rand_bytes(20),
+                    <<
+                    Payload1:10/binary,
+                    Payload2:5/binary,
+                    Payload3/binary
+                    >> = Payload,
+
+                    FakeFragment1 = get_binary_frame(0, 0, 0, 0, 2, 0, 10, 0, Payload1),
+                    FakeFragment2 = get_binary_frame(0, 0, 0, 0, 0, 0, 5, 0, Payload2),
+                    FakeFragment3 = get_binary_frame(1, 0, 0, 0, 0, 0, 5, 0, Payload3),
+
+
+                    Data1 = <<FakeFragment1/binary, FakeFragment2/binary>>,
+                    Data2 = <<FakeFragment3/binary>>,
+
+                    [Message1] = wsecli_message:decode(Data1),
+                    [Message2] = wsecli_message:decode(Data2, Message1),
+
+                    assert_that(Message1#message.type, is(fragmented)),
+                    assert_that(Message2#message.type, is(binary)),
+                    assert_that(Message2#message.payload, is(Payload))
+                end),
+              it("should decode data with complete fragmented messages and part of fragmented one", fun() ->
+                    BinPayload1 = crypto:rand_bytes(30),
+                    <<
+                    Payload1:10/binary,
+                    Payload2:10/binary,
+                    Payload3/binary
+                    >> = BinPayload1,
+
+                    FakeFragment1 = get_binary_frame(0, 0, 0, 0, 2, 0, 10, 0, Payload1),
+                    FakeFragment2 = get_binary_frame(0, 0, 0, 0, 0, 0, 10, 0, Payload2),
+                    FakeFragment3 = get_binary_frame(1, 0, 0, 0, 0, 0, 10, 0, Payload3),
+
+                    BinPayload2 = crypto:rand_bytes(10),
+                    <<
+                    Payload4:10/binary,
+                    _/binary
+                    >> = BinPayload2,
+                    FakeFragment4 = get_binary_frame(0, 0, 0, 0, 2, 0, 10, 0, Payload4),
+
+                    Data = << FakeFragment1/binary, FakeFragment2/binary, FakeFragment3/binary, FakeFragment4/binary>>,
+
+                    [Message1, Message2] = wsecli_message:decode(Data),
+
+                    assert_that(Message1#message.type, is(binary)),
+                    assert_that(Message1#message.payload, is(BinPayload1)),
+                    assert_that(Message2#message.type, is(fragmented)),
+                    assert_that(length(Message2#message.frames), is(1))
+                end)
+
+          end),
         describe("unfragmented messages", fun()->
-              it("shit")
-              %it("decodes a text message", fun() ->
-              %      Payload = "Iepa yei!",
+              it("control messages"),
+              it("should decode data containing various text messages", fun()->
+                  Text1 = "Churras churras",
+                  Payload1 = list_to_binary(Text1),
+                  PayloadLength1 = byte_size(Payload1),
 
-              %      Fin = 1,
-              %      Rsv = 0,
-              %      Opcode = 1, %Text
-              %      Mask = 0,
-              %      PayloadLength = length(Payload),
-              %      PayloadData = list_to_binary(Payload),
+                  Text2 = "Pitas pitas",
+                  Payload2 = list_to_binary(Text2),
+                  PayloadLength2 = byte_size(Payload2),
 
-              %      FakeMessage =
-              %        <<Fin:1, Rsv:3, Opcode:4, Mask:1, PayloadLength:7, PayloadData/bits>>,
+                  Text3 = "Pero que jallo eh",
+                  Payload3 = list_to_binary(Text3),
+                  PayloadLength3 = byte_size(Payload3),
 
-              %      assert_that(wsecli_message:decode(FakeMessage), is({text, Payload}))
-              %  end)
+                  FakeMessage1 = get_binary_frame(1, 0, 0, 0, 1, 0, PayloadLength1, 0, Payload1),
+                  FakeMessage2 = get_binary_frame(1, 0, 0, 0, 1, 0, PayloadLength2, 0, Payload2),
+                  FakeMessage3 = get_binary_frame(1, 0, 0, 0, 1, 0, PayloadLength3, 0, Payload3),
+
+                  Data = << FakeMessage1/binary, FakeMessage2/binary, FakeMessage3/binary>>,
+
+                  [Message1, Message2, Message3] = wsecli_message:decode(Data),
+
+                  assert_that(Message1#message.type, is(text)),
+                  assert_that(Message1#message.payload, is(Text1)),
+                  assert_that(Message2#message.type, is(text)),
+                  assert_that(Message2#message.payload, is(Text2)),
+                  assert_that(Message3#message.type, is(text)),
+                  assert_that(Message3#message.payload, is(Text3))
+                end),
+              it("should decode data containing text and binary messages", fun()->
+                  Text1 = "Churras churras",
+                  Payload1 = list_to_binary(Text1),
+                  PayloadLength1 = byte_size(Payload1),
+
+                  Payload2 = crypto:rand_bytes(20),
+                  PayloadLength2 = 20,
+
+                  Text3 = "Pero que jallo eh",
+                  Payload3 = list_to_binary(Text3),
+                  PayloadLength3 = byte_size(Payload3),
+
+                  FakeMessage1 = get_binary_frame(1, 0, 0, 0, 1, 0, PayloadLength1, 0, Payload1),
+                  FakeMessage2 = get_binary_frame(1, 0, 0, 0, 2, 0, PayloadLength2, 0, Payload2),
+                  FakeMessage3 = get_binary_frame(1, 0, 0, 0, 1, 0, PayloadLength3, 0, Payload3),
+
+                  Data = << FakeMessage1/binary, FakeMessage2/binary, FakeMessage3/binary>>,
+
+                  [Message1, Message2, Message3] = wsecli_message:decode(Data),
+
+                  assert_that(Message1#message.type, is(text)),
+                  assert_that(Message1#message.payload, is(Text1)),
+                  assert_that(Message2#message.type, is(binary)),
+                  assert_that(Message2#message.payload, is(Payload2)),
+                  assert_that(Message3#message.type, is(text)),
+                  assert_that(Message3#message.payload, is(Text3))
+                end),
+              it("should decode data containing all message types"),
+              it("should decode data containing a binary message", fun() ->
+                    Payload = crypto:rand_bytes(45),
+                    %")
+                    FakeMessage = get_binary_frame(1, 0, 0, 0, 2, 0, 45, 0, Payload),
+                    [Message] = wsecli_message:decode(FakeMessage),
+
+                    assert_that( Message#message.payload, is(Payload))
+                end),
+              it("should decode data containing a text message", fun() ->
+                    Payload = "Iepa yei!",
+                    PayloadLength = length(Payload),
+                    PayloadData = list_to_binary(Payload),
+
+                    FakeMessage = get_binary_frame(1, 0, 0, 0, 1, 0, PayloadLength, 0, PayloadData),
+                    [Message] = wsecli_message:decode(FakeMessage),
+
+                    assert_that( Message#message.payload, is(Payload))
+                end)
           end)
       end).
+
+get_binary_frame(Fin, Rsv1, Rsv2, Rsv3, Opcode, Mask, Length, ExtendedPayloadLength, Payload) ->
+  Head = <<Fin:1, Rsv1:1, Rsv2:1, Rsv3:1, Opcode:4, Mask:1, Length:7>>,
+
+  case Length of
+    126 ->
+      <<Head/binary, ExtendedPayloadLength:16, Payload/binary>>;
+    127 ->
+      <<Head/binary, ExtendedPayloadLength:64, Payload/binary>>;
+    _ ->
+      <<Head/binary, Payload/binary>>
+  end.

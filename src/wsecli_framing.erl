@@ -40,15 +40,8 @@ from_binary(<<Head:9, PayloadLen:7, Payload:PayloadLen/binary, Rest/binary>>, Ac
 from_binary(<<>>, Acc) ->
   Acc.
 
-decode_frame(Data) ->
+decode_frame(Data = <<Fin:1, Rsv1:1, Rsv2:1, Rsv3:1, Opcode:4, Mask:1, _/bits>> ) ->
   % TODO: ensure that Mask is not set
-  <<
-    Fin:1,
-    Rsv1:1, Rsv2:1, Rsv3:1,
-    Opcode:4,
-    Mask:1,
-    _/bits
-  >> = Data,
 
   Frame = #frame{
     fin = Fin,
@@ -86,9 +79,7 @@ binary_payload(Data, Frame) ->
   end,
 
   case Frame#frame.opcode of
-    ?OP_CODE_TEXT ->
-      Frame#frame{ payload = Payload };
-    ?OP_CODE_CONT ->
+    _ ->
       Frame#frame{ payload = Payload }
   end.
 
