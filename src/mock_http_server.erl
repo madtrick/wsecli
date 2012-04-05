@@ -40,7 +40,7 @@ handle_cast({accepted, Socket}, State) ->
 handle_info({tcp, _Socket, Data}, State) ->
   case State#state.handshaked  of
     true ->
-      receive_data(State#state.test_process, Data),
+      receive_data(State#state.test_process, Data, State),
       {noreply, State};
     false ->
       handshake(Data, State),
@@ -64,9 +64,14 @@ code_change(_OldVersion, Library, _Extra) -> {ok, Library}.
 %
 % Internal
 %
-receive_data(TestProcess, _Data) ->
+receive_data(TestProcess, Data, State) ->
   TestProcess ! {mock_http_server, received_data},
-  ok.
+  <<_:4, OpCode:4,_:1, Length:7, MaskKey:32, Payload:Length/binary>> = Data,
+  UnmaskedPayload = mask(Payload, MaskKey, <<>>),
+
+  Message = <<1:1, 0:3, OpCode:4, 0:1, Length:7, UnmaskedPayload/binary>>,
+  gen_tcp:send(State#state.socket, Message).
+
 handshake(Data, State) ->
 
   {ok, {http_request, Method, Uri, Version}, Rest} = erlang:decode_packet(http, Data, []),
@@ -111,3 +116,26 @@ get_request_version(Request) ->
 
 get_request_value(Key, Request) ->
   proplists:get_value(Key, Request).
+
+
+mask(<<Data:32, Rest/bits>>, MaskKey, Acc) ->
+  T = Data bxor MaskKey,
+  mask(Rest, MaskKey, <<Acc/binary, T:32>>);
+
+mask(<<Data:24>>, MaskKey, Acc) ->
+  <<MaskKey2:24, _/bits>> = <<MaskKey:32>>,
+  T = Data bxor MaskKey2,
+  <<Acc/binary, T:24>>;
+
+mask(<<Data:16>>, MaskKey, Acc) ->
+  <<MaskKey2:16, _/bits>> = <<MaskKey:32>>,
+  T = Data bxor MaskKey2,
+  <<Acc/binary, T:16>>;
+
+mask(<<Data:8>>, MaskKey, Acc) ->
+  <<MaskKey2:8, _/bits>> = <<MaskKey:32>>,
+  T = Data bxor MaskKey2,
+  <<Acc/binary, T:8>>;
+
+mask(<<>>, _, Acc) ->
+  Acc.

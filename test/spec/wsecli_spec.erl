@@ -96,5 +96,41 @@ spec() ->
                 wsecli:stop()
             end),
           it("should invoke on_error if not connected")
-      end)
+      end),
+      describe("on_message", fun() ->
+            it("should be called when a data message is received", fun() ->
+                  Pid = self(),
+                  wsecli:start("localhost", 8080, "/"),
+                  wsecli:on_message(fun(_Type,_Messae)-> Pid ! {Pid, on_message} end),
+                  wsecli:on_open(fun() -> wsecli:send("Hello") end),
+
+                  
+                  assert_that((fun() ->
+                          receive
+                            {Pid, on_message} ->
+                              true
+                          after 500 ->
+                              false
+                          end
+                      end)(), is(true)),
+                  wsecli:stop()
+
+              end),
+            it("should be called with the data in the message as parameter", fun() ->
+                  Pid = self(),
+                  wsecli:start("localhost", 8080, "/"),
+                  wsecli:on_message(fun(text, Message)-> Pid ! {Pid, on_message, Message} end),
+                  wsecli:on_open(fun() -> wsecli:send("Hello") end),
+
+                  Message = receive
+                    {Pid, on_message, Data} ->
+                      Data
+                  after 500 ->
+                      false
+                  end,
+                  assert_that(Message, is("Hello")),
+                  wsecli:stop()
+
+              end)
+        end)
     end).
