@@ -109,6 +109,32 @@ spec() ->
                     assert_that(Opcode2, is(0)),
                     assert_that(Opcode3, is(0))
                 end)
+          end),
+        describe("control messages", fun() ->
+              describe("ping", fun() ->
+                    it("should return a list of one frame", fun() ->
+                          [_Frame] = wsecli_message:encode([], ping)
+                      end),
+                    it("should return a ping frame", fun() ->
+                          [Frame] = wsecli_message:encode([], ping),
+
+                          <<Fin:1, Rsv:3, Opcode:4, _/binary>> = Frame,
+
+                          assert_that(Fin, is(1)),
+                          assert_that(Rsv, is(0)),
+                          assert_that(Opcode, is(9))
+                      end),
+                    it("should attach application payload", fun() ->
+                          [Frame] = wsecli_message:encode("1234", ping),
+
+                          <<_Fin:1, _Rsv:3, _Opcode:4, 1:1, 4:7, _Mask:32, _Payload:4/binary>> = Frame
+                      end),
+                    it("should not fragment", fun() ->
+                          [Frame] = wsecli_message:encode(crypto:rand_bytes(5000), ping),
+
+                          <<1:1, 0:3, 9:4, 1:1, 126:7, 5000:16, _/binary>> = Frame
+                      end)
+                end)
           end)
     end),
   it("wsecli_message:control"),

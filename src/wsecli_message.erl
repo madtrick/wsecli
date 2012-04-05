@@ -26,6 +26,9 @@ decode(Data, Message) ->
 % Internal
 %
 -spec encode(Data::binary(), Type :: atom(), Acc ::list()) -> list().
+encode(Data, ping, _Acc) ->
+  [frame(Data, [fin, {opcode, ping}])];
+
 encode(<<Data:?FRAGMENT_SIZE/binary>>, Type, Acc) ->
   [frame(Data, [fin, {opcode, Type}]) | Acc];
 
