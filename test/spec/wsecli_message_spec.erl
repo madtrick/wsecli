@@ -129,15 +129,30 @@ spec() ->
 
                           <<_Fin:1, _Rsv:3, _Opcode:4, 1:1, 4:7, _Mask:32, _Payload:4/binary>> = Frame
                       end),
-                    it("should not fragment", fun() ->
-                          [Frame] = wsecli_message:encode(crypto:rand_bytes(5000), ping),
+                    it("should not allow payload over 125 bytes")
+                end),
+              describe("pong", fun() ->
+                    it("should return a list of one frame", fun() ->
+                          [_Frame] = wsecli_message:encode([], pong)
+                      end),
+                    it("should return a ping frame", fun() ->
+                          [Frame] = wsecli_message:encode([], pong),
 
-                          <<1:1, 0:3, 9:4, 1:1, 126:7, 5000:16, _/binary>> = Frame
-                      end)
+                          <<Fin:1, Rsv:3, Opcode:4, _/binary>> = Frame,
+
+                          assert_that(Fin, is(1)),
+                          assert_that(Rsv, is(0)),
+                          assert_that(Opcode, is(10))
+                      end),
+                    it("should attach application payload", fun() ->
+                          [Frame] = wsecli_message:encode("1234", pong),
+
+                          <<_Fin:1, _Rsv:3, _Opcode:4, 1:1, 4:7, _Mask:32, _Payload:4/binary>> = Frame
+                      end),
+                    it("should not allow payload over 125 bytes")
                 end)
           end)
     end),
-  it("wsecli_message:control"),
   describe("decode", fun()->
         describe("fragmented messages", fun() ->
               it("should complain when control messages are fragmented"),
@@ -328,6 +343,26 @@ spec() ->
                     [Message] = wsecli_message:decode(FakeMessage),
 
                     assert_that( Message#message.payload, is(Payload))
+                end),
+              describe("control frames", fun() ->
+                    describe("ping", fun() ->
+                          it("should return a message with type ping", fun() ->
+                                FakeMessage = get_binary_frame(1, 0, 0, 0, 9, 0, 0, 0, <<>>),
+
+                                [Message] = wsecli_message:decode(FakeMessage),
+
+                                assert_that(Message#message.type, is(ping))
+                            end)
+                      end),
+                    describe("pong", fun() ->
+                          it("should return a message with type pong", fun() ->
+                                FakeMessage = get_binary_frame(1, 0, 0, 0, 10, 0, 0, 0, <<>>),
+
+                                [Message] = wsecli_message:decode(FakeMessage),
+
+                                assert_that(Message#message.type, is(pong))
+                            end)
+                      end)
                 end)
           end)
       end).

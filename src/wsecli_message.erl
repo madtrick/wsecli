@@ -26,8 +26,8 @@ decode(Data, Message) ->
 % Internal
 %
 -spec encode(Data::binary(), Type :: atom(), Acc ::list()) -> list().
-encode(Data, ping, _Acc) ->
-  [frame(Data, [fin, {opcode, ping}])];
+encode(Data, Type, _Acc) when Type =:= ping ; Type =:= pong->
+  [frame(Data, [fin, {opcode, Type}])];
 
 encode(<<Data:?FRAGMENT_SIZE/binary>>, Type, Acc) ->
   [frame(Data, [fin, {opcode, Type}]) | Acc];
@@ -114,7 +114,13 @@ build_message(Message, Frames) ->
       Message#message{type = text, payload = Payload};
     2 ->
       Payload = build_payload_from_frames(binary, Frames),
-      Message#message{type = binary, payload = Payload}
+      Message#message{type = binary, payload = Payload};
+    9 ->
+      Payload = build_payload_from_frames(text, Frames),
+      Message#message{type = ping, payload = Payload};
+    10 ->
+      Payload = build_payload_from_frames(text, Frames),
+      Message#message{type = pong, payload = Payload}
   end.
 
 build_payload_from_frames(binary, Frames) ->
