@@ -343,57 +343,95 @@ spec() ->
               %      assert_that(Frame#frame.opcode, is(2))
               %  end),
               describe("control frames", fun()->
-                    it("should send connection close frames", fun() ->
-                          Frame = wsecli_framing:control_frame({close, 1000, "Closing this shit"}),
-                          %mask function also unmask the data
-                          <<Code:16, Reason/binary>> = mask(
-                            Frame#frame.payload,
-                            Frame#frame.masking_key,
-                            <<>>),
+                    describe("close", fun() ->
+                          it("should frame closes without payload", fun() ->
+                                Frame = wsecli_framing:frame([], [fin, {opcode, close}]),
 
-                          assert_that(Frame#frame.fin, is(1)),
-                          assert_that(Frame#frame.rsv1, is(0)),
-                          assert_that(Frame#frame.rsv2, is(0)),
-                          assert_that(Frame#frame.rsv3, is(0)),
-                          assert_that(Frame#frame.opcode, is(8)),
-                          assert_that(Code, is(1000)),
-                          assert_that(Frame#frame.mask, is(1)),
-                          assert_that(binary_to_list(Reason), is("Closing this shit"))
+                                assert_that(Frame#frame.fin, is(1)),
+                                assert_that(Frame#frame.rsv1, is(0)),
+                                assert_that(Frame#frame.rsv2, is(0)),
+                                assert_that(Frame#frame.rsv3, is(0)),
+                                assert_that(Frame#frame.opcode, is(8)),
+                                assert_that(Frame#frame.mask, is(0))
+                            end),
+                          it("should frames closes with payload", fun() ->
+                                Frame = wsecli_framing:frame({1000, "Closing this shit"}, [fin, {opcode, close}]),
+                                %mask function also unmask the data
+                                <<Code:16, Reason/binary>> = mask(
+                                  Frame#frame.payload,
+                                  Frame#frame.masking_key,
+                                  <<>>),
+
+                                assert_that(Frame#frame.fin, is(1)),
+                                assert_that(Frame#frame.rsv1, is(0)),
+                                assert_that(Frame#frame.rsv2, is(0)),
+                                assert_that(Frame#frame.rsv3, is(0)),
+                                assert_that(Frame#frame.opcode, is(8)),
+                                assert_that(Code, is(1000)),
+                                assert_that(Frame#frame.mask, is(1)),
+                                assert_that(binary_to_list(Reason), is("Closing this shit"))
+                            end)
                       end),
-                    it("should send PING frames", fun() ->
-                          Frame = wsecli_framing:control_frame({ping, "Andale"}),
+                    describe("ping", fun() ->
+                          it("should frame pings without payload", fun() ->
+                                Frame = wsecli_framing:frame([], [fin, {opcode, ping}]),
 
-                          MaskedData = mask(
-                            list_to_binary("Andale"),
-                            Frame#frame.masking_key,
-                            <<>>),
+                                assert_that(Frame#frame.fin, is(1)),
+                                assert_that(Frame#frame.rsv1, is(0)),
+                                assert_that(Frame#frame.rsv2, is(0)),
+                                assert_that(Frame#frame.rsv3, is(0)),
+                                assert_that(Frame#frame.opcode, is(9)),
+                                assert_that(Frame#frame.mask, is(0)),
+                                assert_that(Frame#frame.payload, is(undefined))
+                            end),
+                          it("should frame pings with payload", fun() ->
+                                Frame = wsecli_framing:frame("Andale", [fin, {opcode, ping}]),
 
-                          assert_that(Frame#frame.fin, is(1)),
-                          assert_that(Frame#frame.rsv1, is(0)),
-                          assert_that(Frame#frame.rsv2, is(0)),
-                          assert_that(Frame#frame.rsv3, is(0)),
-                          assert_that(Frame#frame.opcode, is(9)),
-                          assert_that(Frame#frame.mask, is(1)),
-                          assert_that(Frame#frame.payload, is(MaskedData))
+                                MaskedData = mask(
+                                  list_to_binary("Andale"),
+                                  Frame#frame.masking_key,
+                                  <<>>),
+
+                                assert_that(Frame#frame.fin, is(1)),
+                                assert_that(Frame#frame.rsv1, is(0)),
+                                assert_that(Frame#frame.rsv2, is(0)),
+                                assert_that(Frame#frame.rsv3, is(0)),
+                                assert_that(Frame#frame.opcode, is(9)),
+                                assert_that(Frame#frame.mask, is(1)),
+                                assert_that(Frame#frame.payload, is(MaskedData))
+                            end)
                       end),
-                    it("should send PONG frames", fun() ->
-                          Frame = wsecli_framing:control_frame({pong, "Andale"}),
+                    describe("pong", fun() ->
+                          it("should frame pong without payload", fun() ->
+                                Frame = wsecli_framing:frame([], [fin, {opcode, pong}]),
 
-                          MaskedData = mask(
-                            list_to_binary("Andale"),
-                            Frame#frame.masking_key,
-                            <<>>),
+                                assert_that(Frame#frame.fin, is(1)),
+                                assert_that(Frame#frame.rsv1, is(0)),
+                                assert_that(Frame#frame.rsv2, is(0)),
+                                assert_that(Frame#frame.rsv3, is(0)),
+                                assert_that(Frame#frame.opcode, is(10)),
+                                assert_that(Frame#frame.mask, is(0)),
+                                assert_that(Frame#frame.payload, is(undefined))
+                            end),
+                          it("should fram pongs with payload", fun() ->
+                                Frame = wsecli_framing:frame("Andale", [fin, {opcode, pong}]),
 
-                          assert_that(Frame#frame.fin, is(1)),
-                          assert_that(Frame#frame.rsv1, is(0)),
-                          assert_that(Frame#frame.rsv2, is(0)),
-                          assert_that(Frame#frame.rsv3, is(0)),
-                          assert_that(Frame#frame.opcode, is(10)),
-                          assert_that(Frame#frame.mask, is(1)),
-                          assert_that(Frame#frame.payload, is(MaskedData))
-                      end)
-                end),
-              it("should fragmen messages")
+                                MaskedData = mask(
+                                  list_to_binary("Andale"),
+                                  Frame#frame.masking_key,
+                                  <<>>),
+
+                                assert_that(Frame#frame.fin, is(1)),
+                                assert_that(Frame#frame.rsv1, is(0)),
+                                assert_that(Frame#frame.rsv2, is(0)),
+                                assert_that(Frame#frame.rsv3, is(0)),
+                                assert_that(Frame#frame.opcode, is(10)),
+                                assert_that(Frame#frame.mask, is(1)),
+                                assert_that(Frame#frame.payload, is(MaskedData))
+                            end)
+                      end),
+                    it("should not allow payload size over 125 bytes")
+                end)
           end)
     end).
 

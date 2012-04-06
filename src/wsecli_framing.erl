@@ -1,7 +1,7 @@
 -module(wsecli_framing).
 -include("wsecli.hrl").
 
--export([to_binary/1, from_binary/1, frame/1, frame/2, control_frame/1]).
+-export([to_binary/1, from_binary/1, frame/1, frame/2]).
 
 -define(OP_CODE_CONT, 0).
 -define(OP_CODE_TEXT, 1).
@@ -101,6 +101,12 @@ frame(Data) when is_list(Data)->
 frame(Data, Options) when is_list(Data) ->
   frame(list_to_binary(Data), Options);
 
+%don't like having this function clause just for close frames
+frame({CloseCode, Reason}, Options) ->
+  BinReason = list_to_binary(Reason),
+  Data = <<CloseCode:16, BinReason/binary>>,
+  frame(Data, Options);
+
 frame(Data, Options) ->
   Frame = #frame{},
   Frame2 = length(Frame, Data),
@@ -139,28 +145,6 @@ apply_options(Frame, [{opcode, pong} | Tail]) ->
 apply_options(Frame, []) ->
   Frame.
 
--spec control_frame({close, Code::integer(), Reason::string()}) -> #frame{};
-                  ({ping, Reason::string()}) -> #frame{};
-                  ({pong, Reason::string()}) -> #frame{}.
-control_frame({close, Code, Reason}) ->
-  %%TODO: enforce that Reason + Code is <= than 125 bytes
-  BinReason = list_to_binary(Reason),
-  Data = <<Code:16, BinReason/binary>>,
-  frame(Data, [fin, {opcode, close}]);
-
-control_frame({pong, Reason}) ->
-  frame(Reason, [fin, {opcode, pong}]);
-
-control_frame({ping, Reason}) ->
-  frame(Reason, [fin, {opcode, ping}]).
-
--spec op_code( Data ::binary() | string()) -> pos_integer().
-op_code(Data) when is_binary(Data) ->
-  ?OP_CODE_BIN;
-
-op_code(Data) ->
-  ?OP_CODE_TEXT.
-
 -spec length(Frame::#frame{}, Data :: binary()) -> #frame{}.
 length(Frame, Data) ->
   %Len = string:len(Data),
@@ -187,6 +171,9 @@ length(Frame, Data) ->
   end.
 
 -spec mask(Frame::#frame{}, Data::binary()) -> #frame{}.
+mask(Frame, <<>>) ->
+  Frame#frame{mask = 0};
+
 mask(Frame, Data) ->
   <<MaskKey:32>> = crypto:rand_bytes(4),
   %BinData = list_to_binary(Data),
