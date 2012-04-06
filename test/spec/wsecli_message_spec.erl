@@ -111,6 +111,25 @@ spec() ->
                 end)
           end),
         describe("control messages", fun() ->
+              describe("close", fun() ->
+                    it("should return a list of one frame", fun() ->
+                          [_Frame] = wsecli_message:encode([], close)
+                      end),
+                    it("should return a close frame", fun() ->
+                          [Frame] = wsecli_message:encode([], close),
+
+                          <<Fin:1, Rsv:3, Opcode:4, _/binary>> = Frame,
+
+                          assert_that(Fin, is(1)),
+                          assert_that(Rsv, is(0)),
+                          assert_that(Opcode, is(8))
+                      end),
+                    it("should attach application payload", fun() ->
+                          [Frame] = wsecli_message:encode({1004, "Chapando el garito"}, close),
+
+                          <<_Fin:1, _Rsv:3, _Opcode:4, 1:1, _PayloadLen:7, _Mask:32, _Payload/binary>> = Frame
+                      end)
+                end),
               describe("ping", fun() ->
                     it("should return a list of one frame", fun() ->
                           [_Frame] = wsecli_message:encode([], ping)
@@ -128,8 +147,7 @@ spec() ->
                           [Frame] = wsecli_message:encode("1234", ping),
 
                           <<_Fin:1, _Rsv:3, _Opcode:4, 1:1, 4:7, _Mask:32, _Payload:4/binary>> = Frame
-                      end),
-                    it("should not allow payload over 125 bytes")
+                      end)
                 end),
               describe("pong", fun() ->
                     it("should return a list of one frame", fun() ->
@@ -148,8 +166,7 @@ spec() ->
                           [Frame] = wsecli_message:encode("1234", pong),
 
                           <<_Fin:1, _Rsv:3, _Opcode:4, 1:1, 4:7, _Mask:32, _Payload:4/binary>> = Frame
-                      end),
-                    it("should not allow payload over 125 bytes")
+                      end)
                 end)
           end)
     end),

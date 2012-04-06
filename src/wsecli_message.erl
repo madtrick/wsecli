@@ -26,8 +26,10 @@ decode(Data, Message) ->
 % Internal
 %
 -spec encode(Data::binary(), Type :: atom(), Acc ::list()) -> list().
-encode(Data, Type, _Acc) when Type =:= ping ; Type =:= pong->
+encode(Data, Type, _Acc) when Type =:= ping ; Type =:= pong ; Type =:= close->
   [frame(Data, [fin, {opcode, Type}])];
+  %Frame = wsecli_framing:frame(Data, [fin, {opcode, Type}]),
+  %wsecli_framing:to_binary(Frame);
 
 encode(<<Data:?FRAGMENT_SIZE/binary>>, Type, Acc) ->
   [frame(Data, [fin, {opcode, Type}]) | Acc];
