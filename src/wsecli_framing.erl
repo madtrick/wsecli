@@ -12,17 +12,30 @@
 
 -spec to_binary(Frame::#frame{}) -> binary().
 to_binary(Frame) ->
-  <<
+  Bin1 = <<
     (Frame#frame.fin):1,
     (Frame#frame.rsv1):1, (Frame#frame.rsv2):1, (Frame#frame.rsv3):1,
     (Frame#frame.opcode):4,
     (Frame#frame.mask):1,
     (Frame#frame.payload_len):7,
     (Frame#frame.extended_payload_len):(extended_payload_len_bit_width(Frame#frame.extended_payload_len, 16)),
-    (Frame#frame.extended_payload_len_cont):(extended_payload_len_bit_width(Frame#frame.extended_payload_len_cont, 64)),
-    (Frame#frame.masking_key):32,
-    (Frame#frame.payload)/binary
-  >>.
+    (Frame#frame.extended_payload_len_cont):(extended_payload_len_bit_width(Frame#frame.extended_payload_len_cont, 64))
+  >>,
+
+  Bin2 = case Frame#frame.masking_key of
+    undefined -> Bin1;
+    Key ->
+      <<Bin1/binary, Key:32>>
+  end,
+
+  case Frame#frame.payload of
+    undefined -> Bin2;
+    Payload ->
+      <<Bin2/binary, Payload/binary>>
+  end.
+
+    %(Frame#frame.masking_key):32,
+    %(Frame#frame.payload)/binary
 
 -spec from_binary(Data::binary()) -> list(#frame{}).
 from_binary(Data) ->
