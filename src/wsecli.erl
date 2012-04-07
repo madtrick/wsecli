@@ -28,7 +28,7 @@ start(Host, Port, Path)->
 
 -spec stop() -> ok.
 stop() ->
-  error_logger:info_msg("Calling stop on wsecli\n"),
+  %error_logger:info_msg("Calling stop on wsecli\n"),
   gen_fsm:sync_send_all_state_event(wsecli, stop).
 
 -spec send(Data::string()) -> ok;
@@ -57,7 +57,7 @@ on_close(Callback) ->
 %
 -spec init({Host::string(), Port::integer(), Resource::string()}) -> {ok, connecting, #data{}}.
 init({Host, Port, Resource}) ->
-  error_logger:info_msg("Start wsecli \n"),
+  %error_logger:info_msg("Start wsecli \n"),
   {ok, Socket} = gen_tcp:connect(Host, Port, [binary, {reuseaddr, true}, {packet, raw}] ),
 
   Handshake = wsecli_handshake:build(Resource, Host, Port),
@@ -95,7 +95,7 @@ closing(Event, StateData) ->
 
 -spec closed(Event::term(), StateData::#data{}) -> term().
 closed(Event, StateData) ->
-  closed.
+  {stop, normal, StateData}.
 
 %
 % GEN_FSM behaviour callbacks
@@ -121,10 +121,7 @@ handle_sync_event(stop, _From, StateName, StateData) when StateName =:= closing 
   ok;
 
 handle_sync_event(stop, _From, connecting, StateData) ->
-  gen_tcp:close(StateData#data.socket),
-      spawn(fun() -> (StateData#data.cb#callbacks.on_close)(undefined) end),
-  %{reply, {ok, closing}, closing, StateData};
-  {stop, normal, stop, StateData};
+  {reply, {ok, closing}, closed, StateData, 1};
 
 handle_sync_event(stop, _From, open, StateData) ->
   Message = wsecli_message:encode([], close),
@@ -151,39 +148,33 @@ handle_info({tcp, Socket, Data}, connecting, StateData) ->
 
 handle_info({tcp, Socket, Data}, open, StateData) ->
   %TODO: append previous fragmented message
-  error_logger:info_msg("Receiving in open state \n"),
+  %error_logger:info_msg("Receiving in open state \n"),
   Messages = wsecli_message:decode(Data),
   NewStateData = process_messages(Messages, StateData),
   {next_state, open, NewStateData};
 
 handle_info({tcp, Socket, Data}, closing, StateData) ->
-  error_logger:info_msg("Received msg in closing state \n"),
+  %error_logger:info_msg("Received msg in closing state \n"),
   [Message] = wsecli_message:decode(Data),
   case Message#message.type of
     close ->
-      %TODO; Maybe move to closed state with timeout
-      %for tcp_close
-      spawn(fun() -> (StateData#data.cb#callbacks.on_close)(undefined) end),
-      {stop, normal, StateData};
+      {next_state, closed, StateData, 500};
     _ ->
       %Discard everything
       {next_state, closing, StateData}
   end;
 
-%TODO: this should be on closed state, because if we receive a tcp_closed on
-%closed state is an error on the comunication
 handle_info({tcp_closed, _}, closing, StateData) ->
-  error_logger:info_msg("Received msg in tcp_closed closing \n"),
-  {stop, normal, StateData};
+  {next_state, closed, StateData, 1};
 
-handle_info({tcp_closed, _}, StateName, StateData) ->
-  error_logger:info_msg("tcp closed in state ~w \n", [StateName]),
-  {stop, closed_socket, StateData}.
+handle_info(_, closed, StateData) ->
+  {stop, normal, StateData}.
 
 -spec terminate(Reason::atom(), StateName::atom(), #data{}) -> [].
 terminate(_Reason, _StateName, StateData) ->
-  error_logger:error_msg("Closing wsecli socket \n"),
-  gen_tcp:close(StateData#data.socket).
+  %error_logger:error_msg("Closing wsecli socket \n"),
+  gen_tcp:close(StateData#data.socket),
+  spawn(fun() -> (StateData#data.cb#callbacks.on_close)(undefined) end).
 
 code_change(OldVsn, StateName, StateData, Extra) ->
   code_change.

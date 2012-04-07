@@ -87,7 +87,7 @@ spec() ->
                 receive {mock_http_server, received_data} -> ok end,
 
                 assert_that(meck:called(gen_tcp, send, '_'), is(true)),
-                assert_that(meck:called(wsecli_message, encode, '_'), is(true)),
+                %assert_that(meck:called(wsecli_message, encode, '_'), is(true)),
                 cleanly_stop_wsecli(true),
                 meck:unload(wsecli_message)
             end),
@@ -115,7 +115,7 @@ spec() ->
                   wsecli:start("localhost", 8080, "/"),
                   wsecli:on_message(fun(_Type,_Messae)-> Pid ! {Pid, on_message} end),
                   wsecli:on_open(fun() -> wsecli:send("Hello") end),
-                  
+
                   assert_that((fun() ->
                           receive
                             {Pid, on_message} ->
@@ -171,11 +171,8 @@ spec() ->
 
                   assert_that(meck:called(gen_tcp, close, '_') , is(true))
               end)
-        end),
-        describe("on_close", fun() ->
-              it("should be called ")
-          end)
-    end).
+        end)
+  end).
 
 cleanly_stop_wsecli(_) ->
   Pid = self(),
