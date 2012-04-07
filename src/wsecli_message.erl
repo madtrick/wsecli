@@ -117,6 +117,9 @@ build_message(Message, Frames) ->
     2 ->
       Payload = build_payload_from_frames(binary, Frames),
       Message#message{type = binary, payload = Payload};
+    8 ->
+      Payload = build_payload_from_frames(close, Frames),
+      Message#message{type = close, payload = Payload};
     9 ->
       Payload = build_payload_from_frames(text, Frames),
       Message#message{type = ping, payload = Payload};
@@ -126,17 +129,26 @@ build_message(Message, Frames) ->
   end.
 
 build_payload_from_frames(binary, Frames) ->
-  contatenate_payload_from_frames(Frames);
+  concatenate_payload_from_frames(Frames);
 
 build_payload_from_frames(text, Frames) ->
-  Payload = contatenate_payload_from_frames(Frames),
-  binary_to_list(Payload).
+  Payload = concatenate_payload_from_frames(Frames),
+  binary_to_list(Payload);
 
-contatenate_payload_from_frames(Frames) ->
-  contatenate_payload_from_frames(Frames, <<>>).
+build_payload_from_frames(close, Frames) ->
+  Payload = concatenate_payload_from_frames(Frames),
+  case Payload of
+    <<>> ->
+      undefined;
+    <<StatusCode:16, Body/binary>> ->
+      {StatusCode, Body}
+  end.
 
-contatenate_payload_from_frames([], Acc) ->
+concatenate_payload_from_frames(Frames) ->
+  concatenate_payload_from_frames(Frames, <<>>).
+
+concatenate_payload_from_frames([], Acc) ->
   Acc;
-contatenate_payload_from_frames([Frame | Rest], Acc) ->
-  contatenate_payload_from_frames(Rest, <<Acc/binary, (Frame#frame.payload)/binary>>).
+concatenate_payload_from_frames([Frame | Rest], Acc) ->
+  concatenate_payload_from_frames(Rest, <<Acc/binary, (Frame#frame.payload)/binary>>).
 

@@ -66,11 +66,24 @@ code_change(_OldVersion, Library, _Extra) -> {ok, Library}.
 %
 receive_data(TestProcess, Data, State) ->
   TestProcess ! {mock_http_server, received_data},
-  <<_:4, OpCode:4,_:1, Length:7, MaskKey:32, Payload:Length/binary>> = Data,
-  UnmaskedPayload = mask(Payload, MaskKey, <<>>),
+  <<_:4, Opcode:4, _:1, Length:7, _/binary>> = Data,
 
-  Message = <<1:1, 0:3, OpCode:4, 0:1, Length:7, UnmaskedPayload/binary>>,
-  gen_tcp:send(State#state.socket, Message).
+  case Opcode of
+    8 ->
+      CloseMessage = <<1:1, 0:3, 8:4, 0:1, 0:7>>,
+      gen_tcp:send(State#state.socket, CloseMessage);
+    _ ->
+      case Length of
+        0 ->
+          ok;
+        _ ->
+          <<_:16, MaskKey:32, Payload/binary>> = Data,
+          UnmaskedPayload = mask(Payload, MaskKey, <<>>),
+
+          Message = <<1:1, 0:3, Opcode:4, 0:1, Length:7, UnmaskedPayload/binary>>,
+          gen_tcp:send(State#state.socket, Message)
+      end
+  end.
 
 handshake(Data, State) ->
 
