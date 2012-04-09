@@ -106,8 +106,7 @@ spec() ->
                         end
                     end)(), is(true)),
                 cleanly_stop_wsecli(true)
-            end),
-          it("should invoke on_error if not connected")
+            end)
       end),
       describe("on_message", fun() ->
             it("should be called when a data message is received", fun() ->
@@ -171,7 +170,33 @@ spec() ->
 
                   assert_that(meck:called(gen_tcp, close, '_') , is(true))
               end)
-        end)
+        end),
+      it("should receive fragmented messages", fun() ->
+            Bytes = crypto:rand_bytes(8000),
+            << Payload1:4000/binary, Payload2:2000/binary, Payload3/binary>> = Bytes,
+
+            FakeFrame1 = <<0:1, 0:3, 2:4, 0:1, 126:7, 4000:16, Payload1/binary>>,
+            FakeFrame2 = <<0:1, 0:3, 0:4, 0:1, 126:7, 2000:16, Payload2/binary>>,
+            FakeFrame3 = <<1:1, 0:3, 0:4, 0:1, 126:7, 2000:16, Payload3/binary>>,
+
+            Pid = self(),
+            wsecli:start("localhost", 8080, "/"),
+            wsecli:on_message(fun(binary, Payload) -> Pid ! {Pid, message, Payload} end),
+
+            wsecli:on_open(fun() -> 
+                  %simulate socket messages
+                  timer:sleep(100),
+                  wsecli ! {tcp, socket, FakeFrame1},
+                  wsecli ! {tcp, socket, FakeFrame2},
+                  wsecli ! {tcp, socket, FakeFrame3}
+              end),
+
+            Payload = receive {Pid, message, Message} -> Message end,
+
+            assert_that(Payload, is(Bytes))
+        end),
+      it("should handle ping messages"),
+      it("should handle pong messages")
   end).
 
 cleanly_stop_wsecli(_) ->

@@ -18,7 +18,7 @@
     socket :: gen_tcp:socket(),
     handshake :: #handshake{},
     cb  = #callbacks{},
-    fragmented_message :: #message{}
+    fragmented_message = undefined :: #message{}
   }).
 
 -spec start(Host::string(), Port::integer(), Resource::string()) -> pid().
@@ -77,6 +77,10 @@ connecting({send, _Data}, StateData) ->
   {next_state, connecting, StateData}.
 
 -spec open(Event::term(), StateData::#data{}) -> term().
+open({on_open, Callback}, StateData) ->
+  spawn(Callback),
+  {next_state, open, StateData};
+
 open({send, Data}, StateData) ->
   Message = wsecli_message:encode(Data, text),
   case gen_tcp:send(StateData#data.socket, Message) of
@@ -89,9 +93,9 @@ open({send, Data}, StateData) ->
 
 
 -spec closing(Event::term(), StateData::#data{}) -> term().
-closing(Event, StateData) ->
-  %TODO: handle {send,Data in this state and notify it as an error
-  closing.
+closing({send, _Data}, StateData) ->
+  (StateData#data.cb#callbacks.on_error)("Can't send data while in closing state"),
+  {next_state, closing, StateData}.
 
 -spec closed(Event::term(), StateData::#data{}) -> term().
 closed(Event, StateData) ->
@@ -110,15 +114,14 @@ handle_event({on_message, Callback}, StateName, StateData) ->
 
 handle_event({on_close, Callback}, StateName, StateData) ->
   Callbacks = StateData#data.cb#callbacks{on_close = Callback},
-  {next_state, StateName, StateData#data{cb = Callbacks}};
-
-handle_event(Event, StateName, StateData) ->
-  handl_event.
+  {next_state, StateName, StateData#data{cb = Callbacks}}.
 
 -spec handle_sync_event(stop, pid(), atom(), #data{}) -> {stop, stop, term(), #data{}}.
-handle_sync_event(stop, _From, StateName, StateData) when StateName =:= closing ->
-  %TODO: raise an error
-  ok;
+handle_sync_event(stop, _From, closing, StateData) ->
+  {reply, {ok, already_closing}, closing, StateData};
+
+handle_sync_event(stop, _From, closed, StateData) ->
+  {reply, {ok, closed}, closed, StateData, 1};
 
 handle_sync_event(stop, _From, connecting, StateData) ->
   {reply, {ok, closing}, closed, StateData, 1};
@@ -130,10 +133,11 @@ handle_sync_event(stop, _From, open, StateData) ->
       {reply, {ok, closing}, closing, StateData};
     {error, Reason} ->
       {stop, socket_error, {error, socket_error}, StateData }
-  end;
+  end.
 
-handle_sync_event(Event, From, StateName, StateData) ->
-  handle_sync_event.
+%handle_sync_event(Event, From, StateName, StateData) ->
+%  error_logger:info_msg("Event ~w \n", [Event]),
+%  handle_sync_event.
 
 -spec handle_info({tcp, Socket::gen_tcp:socket(), Data::binary()}, connecting, #data{}) -> {next_state, atom(), #data{}}.
 handle_info({tcp, Socket, Data}, connecting, StateData) ->
@@ -147,10 +151,13 @@ handle_info({tcp, Socket, Data}, connecting, StateData) ->
   end;
 
 handle_info({tcp, Socket, Data}, open, StateData) ->
-  %TODO: append previous fragmented message
-  %error_logger:info_msg("Receiving in open state \n"),
-  Messages = wsecli_message:decode(Data),
-  NewStateData = process_messages(Messages, StateData),
+  {Messages, State} = case StateData#data.fragmented_message of
+    undefined ->
+      {wsecli_message:decode(Data), StateData};
+    Message ->
+      {wsecli_message:decode(Data, Message), StateData#data{fragmented_message = undefined}}
+  end,
+  NewStateData = process_messages(Messages, State),
   {next_state, open, NewStateData};
 
 handle_info({tcp, Socket, Data}, closing, StateData) ->
@@ -158,14 +165,18 @@ handle_info({tcp, Socket, Data}, closing, StateData) ->
   [Message] = wsecli_message:decode(Data),
   case Message#message.type of
     close ->
+      % if we don't receive a tcp_closed message, move to closed state anyway
       {next_state, closed, StateData, 500};
     _ ->
       %Discard everything
+      %TODO: may we stay here in a starvation state if no
+      % close message arruvis????????????????????????
       {next_state, closing, StateData}
   end;
 
-handle_info({tcp_closed, _}, closing, StateData) ->
-  {next_state, closed, StateData, 1};
+
+handle_info({tcp_closed, _}, _StateName, StateData) ->
+ {next_state, closed, StateData, 1};
 
 handle_info(_, closed, StateData) ->
   {stop, normal, StateData}.
