@@ -183,7 +183,6 @@ handle_info(_, closed, StateData) ->
 
 -spec terminate(Reason::atom(), StateName::atom(), #data{}) -> [].
 terminate(_Reason, _StateName, StateData) ->
-  %error_logger:error_msg("Closing wsecli socket \n"),
   gen_tcp:close(StateData#data.socket),
   spawn(fun() -> (StateData#data.cb#callbacks.on_close)(undefined) end).
 
