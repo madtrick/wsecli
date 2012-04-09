@@ -379,6 +379,41 @@ spec() ->
 
                                 assert_that(Message#message.type, is(pong))
                             end)
+                      end),
+                    describe("close", fun() ->
+                          it("should return a message with type close", fun() ->
+                                FakeMessage = get_binary_frame(1, 0, 0, 0, 8, 0, 0, 0, <<>>),
+
+                                [Message] = wsecli_message:decode(FakeMessage),
+
+                                assert_that(Message#message.type, is(close))
+                            end),
+                          describe("with payload", fun() ->
+                                it("should return the payload a a tuple {Status, Reason}", fun()->
+                                      Status = 1004,
+                                      Reason = list_to_binary("A tomar por saco"),
+                                      Payload = <<Status:16, Reason/binary>>,
+                                      PayloadLen = byte_size(Payload),
+                                      FakeMessage = get_binary_frame(1, 0, 0, 0, 8, 0, PayloadLen, 0, Payload),
+
+                                      [Message] = wsecli_message:decode(FakeMessage),
+                                      {St, Re} = Message#message.payload,
+
+                                      assert_that(St, is(Status)),
+                                      assert_that(Re, is("A tomar por saco"))
+                                  end)
+                            end),
+                          describe("without payload", fun() ->
+                                it("should return the payload as a tuple {undefined, undefined}", fun() ->
+                                      FakeMessage = get_binary_frame(1, 0, 0, 0, 8, 0, 0, 0, <<>>),
+
+                                      [Message] = wsecli_message:decode(FakeMessage),
+                                      {Status, Reason} = Message#message.payload,
+
+                                      assert_that(Status, is(undefined)),
+                                      assert_that(Reason, is(undefined))
+                                  end)
+                            end)
                       end)
                 end)
           end)
