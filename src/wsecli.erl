@@ -21,6 +21,12 @@
     fragmented_message = undefined :: #message{}
   }).
 
+%%%%%%%%%%%%%%%%%%%%%
+%
+% PUBLIC API
+%
+%%%%%%%%%%%%%%%%%%%%%
+
 -spec start(Host::string(), Port::integer(), Resource::string()) -> pid().
 start(Host, Port, Path)->
   {ok, Pid} = gen_fsm:start_link({local, wsecli}, ?MODULE, {Host, Port, Path}, [{timeout, 5000}]),
@@ -52,9 +58,11 @@ on_message(Callback) ->
 on_close(Callback) ->
   gen_fsm:send_all_state_event(wsecli, {on_close, Callback}).
 
+%%%%%%%%%%%%%%%%%%%%%
 %
-% GEN_FSM behaviour functions
+% GEN FSM STATENAME FUNCTIONS
 %
+%%%%%%%%%%%%%%%%%%%%%
 -spec init({Host::string(), Port::integer(), Resource::string()}) -> {ok, connecting, #data{}}.
 init({Host, Port, Resource}) ->
   %error_logger:info_msg("Start wsecli \n"),
@@ -101,9 +109,11 @@ closing({send, _Data}, StateData) ->
 closed(Event, StateData) ->
   {stop, normal, StateData}.
 
+%%%%%%%%%%%%%%%%%%%%%
 %
-% GEN_FSM behaviour callbacks
+% GEN FSM CALLBACK FUNCTIONS
 %
+%%%%%%%%%%%%%%%%%%%%%
 handle_event({on_error, Callback}, StateName, StateData) ->
   Callbacks = StateData#data.cb#callbacks{on_error = Callback},
   {next_state, StateName, StateData#data{cb = Callbacks} };
@@ -189,9 +199,11 @@ terminate(_Reason, _StateName, StateData) ->
 code_change(OldVsn, StateName, StateData, Extra) ->
   code_change.
 
+%%%%%%%%%%%%%%%%%%%%%
 %
-% Internal
+% GEN FSM INTERNAL
 %
+%%%%%%%%%%%%%%%%%%%%%
 -spec process_messages(Messages :: list(#message{}), StateData :: #data{}) -> #data{}.
 process_messages([], StateData) ->
   StateData;
