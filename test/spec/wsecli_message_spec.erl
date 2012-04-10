@@ -286,7 +286,6 @@ spec() ->
 
           end),
         describe("unfragmented messages", fun()->
-              it("control messages"),
               it("should decode data containing various text messages", fun()->
                   Text1 = "Churras churras",
                   Payload1 = list_to_binary(Text1),
