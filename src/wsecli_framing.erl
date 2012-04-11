@@ -1,3 +1,5 @@
+%% @hidden
+
 -module(wsecli_framing).
 -include("wsecli.hrl").
 

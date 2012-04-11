@@ -1,3 +1,5 @@
+%% @hidden
+
 -module(mock_http_server).
 -behaviour(gen_server).
 

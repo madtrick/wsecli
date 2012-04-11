@@ -1,3 +1,7 @@
+%% @author Farruco Sanjurjo <madtrick@gmail.com>
+%% @copyright 2012, Farruco Sanjurjo
+%% @doc Websocket Client
+
 -module(wsecli).
 -behaviour(gen_fsm).
 
@@ -26,34 +30,61 @@
 % PUBLIC API
 %
 %%%%%%%%%%%%%%%%%%%%%
-
+%% @doc This function will start the websocket client
+%%
+%% This function will open a connection with the specified remote endpoint. Parameters
+%% <ul>
+%% <li>Host, a string. The URL of the remote endpoint</li>
+%% <li>Port, an integer. The port where the remote endpoint is listening</li>
+%% <li>Resouce, an string. The resource path where the websockets live</li>
+%% </ul>
 -spec start(Host::string(), Port::integer(), Resource::string()) -> pid().
 start(Host, Port, Path)->
   {ok, Pid} = gen_fsm:start_link({local, wsecli}, ?MODULE, {Host, Port, Path}, [{timeout, 5000}]),
   Pid.
 
+%% @doc This function will stop the websocket client
 -spec stop() -> ok.
 stop() ->
   %error_logger:info_msg("Calling stop on wsecli\n"),
   gen_fsm:sync_send_all_state_event(wsecli, stop).
 
+%% @doc Send data to a remote endpoint
 -spec send(Data::string()) -> ok;
           (Data::binary()) -> ok.
 send(Data) ->
   gen_fsm:send_event(wsecli, {send, Data}).
 
+%% @doc Add a callback to be called when a connection is opened
+%%
+%% The callback function must be a function which takes no parameters
 -spec on_open(Callback::fun()) -> any().
 on_open(Callback) ->
   gen_fsm:send_event(wsecli, {on_open, Callback}).
 
+%% @doc Add a callback to be called when an error occurs
+%%
+%% The callback function must be a function which takes one parameter, the reason for
+%%the error
 -spec on_error(Callback::fun()) -> any().
 on_error(Callback) ->
   gen_fsm:send_all_state_event(wsecli, {on_error, Callback}).
 
+%% @doc Add a callback to be called when a message arrives
+%%
+%% The callback function must be a function which takes two parameters:
+%% <ul>
+%% <li> The first is an atom with values binary or text </li>
+%% <li> The second parameter is the message payload</li>
+%% </ul>
 -spec on_message(Callback::fun()) -> any().
 on_message(Callback) ->
   gen_fsm:send_all_state_event(wsecli, {on_message, Callback}).
 
+%% @doc Add a callback to be called when then connection was closed
+%%
+%% The callback function must be a function which takes one parameter, the payload
+%%of the close message received from the remote endpoint (if any)
 -spec on_close(Callback::fun()) -> any().
 on_close(Callback) ->
   gen_fsm:send_all_state_event(wsecli, {on_close, Callback}).
@@ -63,6 +94,7 @@ on_close(Callback) ->
 % GEN FSM STATENAME FUNCTIONS
 %
 %%%%%%%%%%%%%%%%%%%%%
+%% @hidden
 -spec init({Host::string(), Port::integer(), Resource::string()}) -> {ok, connecting, #data{}}.
 init({Host, Port, Resource}) ->
   %error_logger:info_msg("Start wsecli \n"),
@@ -74,6 +106,7 @@ init({Host, Port, Resource}) ->
   ok = gen_tcp:send(Socket, Request),
   {ok, connecting, #data{ socket = Socket, handshake = Handshake}}.
 
+%% @hidden
 -spec connecting({on_open, Callback::fun()}, StateData::#data{}) -> term();
                 ({send, Data::binary()}, StateData::#data{}) -> term().
 connecting({on_open, Callback}, StateData) ->
@@ -84,6 +117,7 @@ connecting({send, _Data}, StateData) ->
   (StateData#data.cb#callbacks.on_error)("Can't send data while in connecting state"),
   {next_state, connecting, StateData}.
 
+%% @hidden
 -spec open(Event::term(), StateData::#data{}) -> term().
 open({on_open, Callback}, StateData) ->
   spawn(Callback),
@@ -100,11 +134,13 @@ open({send, Data}, StateData) ->
   {next_state, open, StateData}.
 
 
+%% @hidden
 -spec closing(Event::term(), StateData::#data{}) -> term().
 closing({send, _Data}, StateData) ->
   (StateData#data.cb#callbacks.on_error)("Can't send data while in closing state"),
   {next_state, closing, StateData}.
 
+%% @hidden
 -spec closed(Event::term(), StateData::#data{}) -> term().
 closed(Event, StateData) ->
   {stop, normal, StateData}.
@@ -114,6 +150,7 @@ closed(Event, StateData) ->
 % GEN FSM CALLBACK FUNCTIONS
 %
 %%%%%%%%%%%%%%%%%%%%%
+%% @hidden
 handle_event({on_error, Callback}, StateName, StateData) ->
   Callbacks = StateData#data.cb#callbacks{on_error = Callback},
   {next_state, StateName, StateData#data{cb = Callbacks} };
@@ -126,6 +163,7 @@ handle_event({on_close, Callback}, StateName, StateData) ->
   Callbacks = StateData#data.cb#callbacks{on_close = Callback},
   {next_state, StateName, StateData#data{cb = Callbacks}}.
 
+%% @hidden
 -spec handle_sync_event(stop, pid(), atom(), #data{}) -> {stop, stop, term(), #data{}}.
 handle_sync_event(stop, _From, closing, StateData) ->
   {reply, {ok, already_closing}, closing, StateData};
@@ -149,6 +187,7 @@ handle_sync_event(stop, _From, open, StateData) ->
 %  error_logger:info_msg("Event ~w \n", [Event]),
 %  handle_sync_event.
 
+%% @hidden
 -spec handle_info({tcp, Socket::gen_tcp:socket(), Data::binary()}, connecting, #data{}) -> {next_state, atom(), #data{}}.
 handle_info({tcp, Socket, Data}, connecting, StateData) ->
   Response = wsecli_http:from_response(Data),
@@ -191,11 +230,13 @@ handle_info({tcp_closed, _}, _StateName, StateData) ->
 handle_info(_, closed, StateData) ->
   {stop, normal, StateData}.
 
+%% @hidden
 -spec terminate(Reason::atom(), StateName::atom(), #data{}) -> [].
 terminate(_Reason, _StateName, StateData) ->
   gen_tcp:close(StateData#data.socket),
   spawn(fun() -> (StateData#data.cb#callbacks.on_close)(undefined) end).
 
+%% @hidden
 code_change(OldVsn, StateName, StateData, Extra) ->
   code_change.
 

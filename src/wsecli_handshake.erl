@@ -1,3 +1,5 @@
+%% @hidden
+
 -module(wsecli_handshake).
 
 -include("wsecli.hrl").

@@ -1,3 +1,5 @@
+%% @hidden
+
 -module(wsecli_key).
 
 -export([generate/0]).
