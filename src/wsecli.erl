@@ -44,18 +44,27 @@ start(Host, Port, Path)->
   Pid.
 
 %% @doc This function will stop the websocket client
+%%
+%% Calling this function doesn't mean that the connection will be inmediatelly closed. A
+%%closing handshake is tryed and only after that the connection is closed.
 -spec stop() -> ok.
 stop() ->
   %error_logger:info_msg("Calling stop on wsecli\n"),
   gen_fsm:sync_send_all_state_event(wsecli, stop).
 
 %% @doc Send data to a remote endpoint
+%%
+%% Websockets only support 2 types of data in the payload of a message: binary or text, so the type to apply
+%%to the data given as parameter to this will depend on the result of the BIFs is_binary and is_list
 -spec send(Data::string()) -> ok;
           (Data::binary()) -> ok.
 send(Data) ->
   gen_fsm:send_event(wsecli, {send, Data}).
 
 %% @doc Add a callback to be called when a connection is opened
+%%
+%% This callback is called when the connection is opened (after a successful websocket handshake)
+%%or inmediatelly if called while in the open state.
 %%
 %% The callback function must be a function which takes no parameters
 -spec on_open(Callback::fun()) -> any().
@@ -74,7 +83,7 @@ on_error(Callback) ->
 %%
 %% The callback function must be a function which takes two parameters:
 %% <ul>
-%% <li> The first is an atom with values binary or text </li>
+%% <li> The first is an atom with values binary or text depending on the type of the websocket message</li>
 %% <li> The second parameter is the message payload</li>
 %% </ul>
 -spec on_message(Callback::fun()) -> any().
@@ -82,6 +91,9 @@ on_message(Callback) ->
   gen_fsm:send_all_state_event(wsecli, {on_message, Callback}).
 
 %% @doc Add a callback to be called when then connection was closed
+%%
+%% This callback will be called when the connection is successfully closed, i.e. after performing the
+%%websocket closing handshake.
 %%
 %% The callback function must be a function which takes one parameter, the payload
 %%of the close message received from the remote endpoint (if any)
