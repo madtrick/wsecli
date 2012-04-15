@@ -196,10 +196,6 @@ handle_sync_event(stop, _From, open, StateData) ->
       {stop, socket_error, {error, socket_error}, StateData }
   end.
 
-%handle_sync_event(Event, From, StateName, StateData) ->
-%  error_logger:info_msg("Event ~w \n", [Event]),
-%  handle_sync_event.
-
 %% @hidden
 -spec handle_info({tcp, Socket::gen_tcp:socket(), Data::binary()}, connecting, #data{}) -> {next_state, atom(), #data{}}.
 handle_info({tcp, Socket, Data}, connecting, StateData) ->
