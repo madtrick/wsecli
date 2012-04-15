@@ -64,7 +64,8 @@ send(Data) ->
 %% @doc Add a callback to be called when a connection is opened
 %%
 %% This callback is called when the connection is opened (after a successful websocket handshake)
-%%or inmediatelly if called while in the open state.
+%%or inmediatelly if called while in the open state. Adding it not it connecting or open state will
+%%raise an error.
 %%
 %% The callback function must be a function which takes no parameters
 -spec on_open(Callback::fun()) -> any().
