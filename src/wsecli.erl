@@ -9,7 +9,7 @@
 
 -export([start/3, stop/0, send/1]).
 -export([on_open/1, on_error/1, on_message/1, on_close/1]).
--export([init/1, connecting/2, open/2, closing/2, closed/2]).
+-export([init/1, connecting/2, open/2, closing/2]).
 -export([handle_event/3, handle_sync_event/4, handle_info/3, terminate/3, code_change/4]).
 
 -record(callbacks, {
@@ -24,6 +24,9 @@
     cb  = #callbacks{},
     fragmented_message = undefined :: #message{}
   }).
+
+-define(CLOSE_HANDSHAKE_TIMEOUT, 2000).
+-define(TCP_CLOSE_TIMEOUT, 500).
 
 %%%%%%%%%%%%%%%%%%%%%
 %
@@ -49,7 +52,6 @@ start(Host, Port, Path)->
 %%closing handshake is tryed and only after that the connection is closed.
 -spec stop() -> ok.
 stop() ->
-  %error_logger:info_msg("Calling stop on wsecli\n"),
   gen_fsm:sync_send_all_state_event(wsecli, stop).
 
 %% @doc Send data to a remote endpoint
@@ -110,7 +112,6 @@ on_close(Callback) ->
 %% @hidden
 -spec init({Host::string(), Port::integer(), Resource::string()}) -> {ok, connecting, #data{}}.
 init({Host, Port, Resource}) ->
-  %error_logger:info_msg("Start wsecli \n"),
   {ok, Socket} = gen_tcp:connect(Host, Port, [binary, {reuseaddr, true}, {packet, raw}] ),
 
   Handshake = wsecli_handshake:build(Resource, Host, Port),
@@ -151,11 +152,16 @@ open({send, Data}, StateData) ->
 -spec closing(Event::term(), StateData::#data{}) -> term().
 closing({send, _Data}, StateData) ->
   (StateData#data.cb#callbacks.on_error)("Can't send data while in closing state"),
-  {next_state, closing, StateData}.
+  {next_state, closing, StateData};
 
 %% @hidden
--spec closed(Event::term(), StateData::#data{}) -> term().
-closed(Event, StateData) ->
+closing({timeout, _Ref, waiting_tcp_close}, StateData) ->
+  %The tcp connection hasn't been close so, kill them all
+  {stop, normal, StateData};
+
+%% @hidden
+closing({timeout, _Ref, waiting_close_reply}, StateData) ->
+  %The websocket close handshake hasn't been properly done, kill them all
   {stop, normal, StateData}.
 
 %%%%%%%%%%%%%%%%%%%%%
@@ -181,16 +187,14 @@ handle_event({on_close, Callback}, StateName, StateData) ->
 handle_sync_event(stop, _From, closing, StateData) ->
   {reply, {ok, closing}, closing, StateData};
 
-handle_sync_event(stop, _From, closed, StateData) ->
-  {reply, {ok, closing}, closed, StateData, 1};
-
 handle_sync_event(stop, _From, connecting, StateData) ->
-  {reply, {ok, closing}, closed, StateData, 1};
+  {stop, normal, {ok, closing}, StateData};
 
 handle_sync_event(stop, _From, open, StateData) ->
   Message = wsecli_message:encode([], close),
   case gen_tcp:send(StateData#data.socket, Message) of
     ok ->
+      gen_fsm:start_timer(?CLOSE_HANDSHAKE_TIMEOUT, waiting_close_reply),
       {reply, {ok, closing}, closing, StateData};
     {error, Reason} ->
       {stop, socket_error, {error, socket_error}, StateData }
@@ -219,25 +223,19 @@ handle_info({tcp, Socket, Data}, open, StateData) ->
   {next_state, open, NewStateData};
 
 handle_info({tcp, Socket, Data}, closing, StateData) ->
-  %error_logger:info_msg("Received msg in closing state \n"),
   [Message] = wsecli_message:decode(Data),
   case Message#message.type of
     close ->
       % if we don't receive a tcp_closed message, move to closed state anyway
-      {next_state, closed, StateData, 500};
+      gen_fsm:start_timer(?TCP_CLOSE_TIMEOUT, waiting_tcp_close),
+      {next_state, closing, StateData};
     _ ->
-      %Discard everything
-      %TODO: may we stay here in a starvation state if no
-      % close message arruvis????????????????????????
       {next_state, closing, StateData}
   end;
 
 
 handle_info({tcp_closed, _}, _StateName, StateData) ->
- {next_state, closed, StateData, 1};
-
-handle_info(_, closed, StateData) ->
-  {stop, normal, StateData}.
+ {stop, normal, StateData}.
 
 %% @hidden
 -spec terminate(Reason::atom(), StateName::atom(), #data{}) -> [].

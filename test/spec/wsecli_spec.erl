@@ -193,7 +193,8 @@ spec() ->
 
             Payload = receive {Pid, message, Message} -> Message end,
 
-            assert_that(Payload, is(Bytes))
+            assert_that(Payload, is(Bytes)),
+            cleanly_stop_wsecli(true)
         end),
       it("should handle ping messages"),
       it("should handle pong messages")
