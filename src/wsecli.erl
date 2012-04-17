@@ -245,7 +245,7 @@ terminate(_Reason, _StateName, StateData) ->
 
 %% @hidden
 code_change(OldVsn, StateName, StateData, Extra) ->
-  code_change.
+  {ok, StateName, StateData}.
 
 %%%%%%%%%%%%%%%%%%%%%
 %
