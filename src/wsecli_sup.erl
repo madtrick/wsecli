@@ -1,3 +1,4 @@
+%% @hidden
 
 -module(wsecli_sup).
 

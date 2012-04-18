@@ -1,3 +1,5 @@
+%% @hidden
+
 -module(wsecli_http).
 -include("wsecli.hrl").
 
