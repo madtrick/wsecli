@@ -10,7 +10,7 @@ task :shell do
   sh "erl -pa ebin deps/*/ebin"
 end
 
-task :test_features do
+task :features do
   sh "ERL_FLAGS='-config app.config' rebar compile run-features path=test/acceptance skip_deps=true"
 end
 
