@@ -11,7 +11,7 @@ task :shell do
 end
 
 task :features do
-  sh "ERL_FLAGS='-config app.config' rebar compile run-features path=test/acceptance skip_deps=true"
+  sh "rebar compile run-features path=test/acceptance skip_deps=true"
 end
 
 task :spec do
