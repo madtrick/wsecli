@@ -3,8 +3,8 @@ wsecli
 
 A WebSocket client written in Erlang
 
-* [Features](#features)
- * [Supported WebSocket version](#versions)
+* [Disclaimer](#disclaimer)
+* [Supported WebSocket version](#versions)
 * [Build](#build)
 * [Usage](#usage)
 * [Tests](#tests)
@@ -12,11 +12,22 @@ A WebSocket client written in Erlang
 * [License](#license)
 * [Contribute](#contribute)
 
-### Features <a name="features"> ###
+### Disclaimer <a name="disclaimer">
 
+This project was born as a side project while I'm doing my end of dregree project. What this means is:
 
-#### Supported protocol versions <a name="versions"/> ###
+* I don't have too much time to include new features.
+
+But,
+
+* I'll try to fix any bugs.
+* I'll try to finish anything on the TODO.
+* If anyone suggests something interesting/cool, I'll try to include it : )
+
+### Supported protocol versions <a name="versions"/> ###
 Currently only the version specificied at [RFC6455](http://tools.ietf.org/html/rfc6455) (version 13) is supported.
+
+Please notice that currently, neither _subprotocols_ nor _extensions_ are currently available.
 
 ### Build <a name="build">###
 
@@ -66,7 +77,7 @@ Callbacks for the events: *on_open*, *on_error*, *on_message* and *on_close* can
 
 #### Unit tests
 
-Unit test where done with the library [_espec_](https://github.com/lucaspiller/espec) by [lucaspiller](https://github.com/lucaspiller)
+Unit test where done with the library [_espec_](https://github.com/lucaspiller/espec) by [lucaspiller](https://github.com/lucaspiller).
 
  To run them
 
@@ -84,7 +95,7 @@ Unit test where done with the library [_espec_](https://github.com/lucaspiller/e
 * Accept WebSocket uris (those with ws:// format).
 * Support streaming (not sure how to do this).
 * Support ssl.
-* Creation on multiple clients.
+* Creation on multiple clients (too lazy, that's why I haven't done it already)
 
 
 ### License <a name="installation">
