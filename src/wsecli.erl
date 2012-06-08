@@ -19,7 +19,6 @@
 -module(wsecli).
 -behaviour(gen_fsm).
 
-%-include("wsecli.hrl").
 -include_lib("wsock/include/wsock.hrl").
 
 -export([start/3, stop/0, send/1]).
