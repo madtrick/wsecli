@@ -13,7 +13,7 @@ A WebSocket client written in Erlang
 * [Contribute](#contribute)
 
 ### Features <a name="features"> ###
-
+ * Built using [wsock](https://github.com/madtrick/wsock)
 
 #### Supported protocol versions <a name="versions"/> ###
 Currently only the version specificied at [RFC6455](http://tools.ietf.org/html/rfc6455) (version 13) is supported.
