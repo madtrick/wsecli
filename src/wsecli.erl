@@ -19,7 +19,7 @@
 -module(wsecli).
 -behaviour(gen_fsm).
 
--include("wsecli.hrl").
+-include_lib("wsock/include/wsock.hrl").
 
 -export([start/3, stop/0, send/1]).
 -export([on_open/1, on_error/1, on_message/1, on_close/1]).
@@ -128,8 +128,8 @@ on_close(Callback) ->
 init({Host, Port, Resource}) ->
   {ok, Socket} = gen_tcp:connect(Host, Port, [binary, {reuseaddr, true}, {packet, raw}] ),
 
-  Handshake = wsecli_handshake:build(Resource, Host, Port),
-  Request = wsecli_http:to_request(Handshake#handshake.message),
+  Handshake = wsock_handshake:open(Resource, Host, Port),
+  Request = wsock_http:encode(Handshake#handshake.message),
 
   ok = gen_tcp:send(Socket, Request),
   {ok, connecting, #data{ socket = Socket, handshake = Handshake}}.
@@ -152,7 +152,7 @@ open({on_open, Callback}, StateData) ->
   {next_state, open, StateData};
 
 open({send, Data}, StateData) ->
-  Message = wsecli_message:encode(Data, text),
+  Message = wsock_message:encode(Data, [mask, text]),
   case gen_tcp:send(StateData#data.socket, Message) of
     ok ->
       ok;
@@ -205,7 +205,7 @@ handle_sync_event(stop, _From, connecting, StateData) ->
   {stop, normal, {ok, closing}, StateData};
 
 handle_sync_event(stop, _From, open, StateData) ->
-  Message = wsecli_message:encode([], close),
+  Message = wsock_message:encode([], [mask, close]),
   case gen_tcp:send(StateData#data.socket, Message) of
     ok ->
       gen_fsm:start_timer(?CLOSE_HANDSHAKE_TIMEOUT, waiting_close_reply),
@@ -217,27 +217,27 @@ handle_sync_event(stop, _From, open, StateData) ->
 %% @hidden
 -spec handle_info({tcp, Socket::gen_tcp:socket(), Data::binary()}, connecting, #data{}) -> {next_state, atom(), #data{}}.
 handle_info({tcp, Socket, Data}, connecting, StateData) ->
-  Response = wsecli_http:from_response(Data),
-  case wsecli_handshake:validate(Response, StateData#data.handshake) of
-    true ->
+  {ok, Response} = wsock_http:decode(Data, response),
+  case wsock_handshake:handle_response(Response, StateData#data.handshake) of
+    {ok, _Handshake} ->
       spawn(StateData#data.cb#callbacks.on_open),
       {next_state, open, StateData};
-    false ->
+    {error, _Error} ->
       {stop, failed_handshake, StateData}
   end;
 
 handle_info({tcp, Socket, Data}, open, StateData) ->
   {Messages, State} = case StateData#data.fragmented_message of
     undefined ->
-      {wsecli_message:decode(Data), StateData};
+      {wsock_message:decode(Data, []), StateData};
     Message ->
-      {wsecli_message:decode(Data, Message), StateData#data{fragmented_message = undefined}}
+      {wsock_message:decode(Data, Message, []), StateData#data{fragmented_message = undefined}}
   end,
   NewStateData = process_messages(Messages, State),
   {next_state, open, NewStateData};
 
 handle_info({tcp, Socket, Data}, closing, StateData) ->
-  [Message] = wsecli_message:decode(Data),
+  [Message] = wsock_message:decode(Data, []),
   case Message#message.type of
     close ->
       % if we don't receive a tcp_closed message, move to closed state anyway

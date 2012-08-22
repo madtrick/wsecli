@@ -12,17 +12,18 @@ A WebSocket client written in Erlang
 * [License](#license)
 * [Contribute](#contribute)
 
-### Disclaimer <a name="disclaimer">
-
 This project was born as a side project while I'm doing my end of dregree project. What this means is:
 
-* I don't have too much time to include new features.
+  * I don't have too much time to include new features.
 
 But,
 
-* I'll try to fix any bugs.
-* I'll try to finish anything on the TODO.
-* If anyone suggests something interesting/cool, I'll try to include it : )
+  * I'll try to fix any bugs.
+  * I'll try to finish anything on the TODO.
+  * If anyone suggests something interesting/cool, I'll try to include it : )
+
+### Features <a name="features"> ###
+  * Built using [wsock](https://github.com/madtrick/wsock)
 
 ### Supported protocol versions <a name="versions"/> ###
 Currently only the version specificied at [RFC6455](http://tools.ietf.org/html/rfc6455) (version 13) is supported.
