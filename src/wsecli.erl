@@ -72,11 +72,9 @@ start(Host, Port, Path) ->
 %% </ul>
 -spec start(Host::string(), Port::integer(), Resource::string(), FsmName::tuple()|atom()) -> pid().
 start(Host, Port, Path, anon) ->
-  {ok, Pid} = gen_fsm:start_link(?MODULE, {Host, Port, Path}, [{timeout, 5000}]),
-  Pid;
+  gen_fsm:start_link(?MODULE, {Host, Port, Path}, [{timeout, 5000}]);
 start(Host, Port, Path, FsmName) ->
-  {ok, Pid} = gen_fsm:start_link(FsmName, ?MODULE, {Host, Port, Path}, [{timeout, 5000}]),
-  Pid.
+  gen_fsm:start_link(FsmName, ?MODULE, {Host, Port, Path}, [{timeout, 5000}]).
 
 %% @doc This function will stop the websocket client
 %%
@@ -210,7 +208,7 @@ on_close(Socket, Callback) ->
 init({Host, Port, Resource}) ->
   {ok, Socket} = gen_tcp:connect(Host, Port, [binary, {reuseaddr, true}, {packet, raw}] ),
 
-  Handshake = wsock_handshake:open(Resource, Host, Port),
+  {ok, Handshake} = wsock_handshake:open(Resource, Host, Port),
   Request = wsock_http:encode(Handshake#handshake.message),
 
   ok = gen_tcp:send(Socket, Request),
