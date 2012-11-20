@@ -19,7 +19,7 @@
 -module(wsecli).
 -behaviour(gen_fsm).
 
--include_lib("wsock/include/wsock.hrl").
+-include_lib("/home/konrad/src/wsecli/deps/wsock/include/wsock.hrl").
 
 -export([start/3, stop/0, send/1]).
 -export([on_open/1, on_error/1, on_message/1, on_close/1]).
@@ -128,7 +128,7 @@ on_close(Callback) ->
 init({Host, Port, Resource}) ->
   {ok, Socket} = gen_tcp:connect(Host, Port, [binary, {reuseaddr, true}, {packet, raw}] ),
 
-  Handshake = wsock_handshake:open(Resource, Host, Port),
+  {ok, Handshake} = wsock_handshake:open(Resource, Host, Port),
   Request = wsock_http:encode(Handshake#handshake.message),
 
   ok = gen_tcp:send(Socket, Request),
