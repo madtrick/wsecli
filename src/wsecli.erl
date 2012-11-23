@@ -128,7 +128,7 @@ on_close(Callback) ->
 init({Host, Port, Resource}) ->
   {ok, Socket} = gen_tcp:connect(Host, Port, [binary, {reuseaddr, true}, {packet, raw}] ),
 
-  Handshake = wsock_handshake:open(Resource, Host, Port),
+  {ok, Handshake} = wsock_handshake:open(Resource, Host, Port),
   Request = wsock_http:encode(Handshake#handshake.message),
 
   ok = gen_tcp:send(Socket, Request),
