@@ -21,8 +21,8 @@
 
 -include_lib("wsock/include/wsock.hrl").
 
--export([start/3, stop/0, send/1]).
--export([on_open/1, on_error/1, on_message/1, on_close/1]).
+-export([start/3, start/4, stop/0, stop/1, send/1, send/2]).
+-export([on_open/1, on_open/2, on_error/1, on_error/2, on_message/1, on_message/2, on_close/1, on_close/2]).
 -export([init/1, connecting/2, open/2, closing/2]).
 -export([handle_event/3, handle_sync_event/4, handle_info/3, terminate/3, code_change/4]).
 
@@ -41,12 +41,14 @@
 
 -define(CLOSE_HANDSHAKE_TIMEOUT, 2000).
 -define(TCP_CLOSE_TIMEOUT, 500).
+-define(DEFAULT_REG_NAME, ?MODULE).
 
 %%%%%%%%%%%%%%%%%%%%%
 %
 % PUBLIC API
 %
 %%%%%%%%%%%%%%%%%%%%%
+
 %% @doc This function will start the websocket client
 %%
 %% This function will open a connection with the specified remote endpoint. Parameters
@@ -56,9 +58,23 @@
 %% <li>Resouce, an string. The resource path where the websockets live</li>
 %% </ul>
 -spec start(Host::string(), Port::integer(), Resource::string()) -> pid().
-start(Host, Port, Path)->
-  {ok, Pid} = gen_fsm:start_link({local, wsecli}, ?MODULE, {Host, Port, Path}, [{timeout, 5000}]),
-  Pid.
+start(Host, Port, Path) ->
+    start(Host, Port, Path, {local, ?DEFAULT_REG_NAME}).
+
+%% @doc This function will start the websocket client
+%%
+%% This function will open a connection with the specified remote endpoint. Parameters
+%% <ul>
+%% <li>Host, a string. The URL of the remote endpoint</li>
+%% <li>Port, an integer. The port where the remote endpoint is listening</li>
+%% <li>Resouce, an string. The resource path where the websockets live</li>
+%% <li>FsmName, a tuple or 'anon'. 'anon' will skip registering process. See also <a href="http://www.erlang.org/doc/man/gen_fsm.html#start_link-3">here</a></li>
+%% </ul>
+-spec start(Host::string(), Port::integer(), Resource::string(), FsmName::tuple()|atom()) -> pid().
+start(Host, Port, Path, anon) ->
+  gen_fsm:start_link(?MODULE, {Host, Port, Path}, [{timeout, 5000}]);
+start(Host, Port, Path, FsmName) ->
+  gen_fsm:start_link(FsmName, ?MODULE, {Host, Port, Path}, [{timeout, 5000}]).
 
 %% @doc This function will stop the websocket client
 %%
@@ -66,7 +82,18 @@ start(Host, Port, Path)->
 %%closing handshake is tryed and only after that the connection is closed.
 -spec stop() -> ok.
 stop() ->
-  gen_fsm:sync_send_all_state_event(wsecli, stop).
+  stop(?DEFAULT_REG_NAME).
+
+%% @doc This function will stop the websocket client
+%%
+%% Calling this function doesn't mean that the connection will be inmediatelly closed. A
+%% closing handshake is tryed and only after that the connection is closed. Parameters
+%% <ul>
+%% <li>Socket, a pid or atom. Handle to socket that is to be closed.</li>
+%% </ul>
+-spec stop(Socket::pid()|atom()) -> ok.
+stop(Socket) ->
+  gen_fsm:sync_send_all_state_event(Socket, stop).
 
 %% @doc Send data to a remote endpoint
 %%
@@ -75,7 +102,19 @@ stop() ->
 -spec send(Data::string()) -> ok;
           (Data::binary()) -> ok.
 send(Data) ->
-  gen_fsm:send_event(wsecli, {send, Data}).
+  send(?DEFAULT_REG_NAME, Data).
+
+%% @doc Send data to a remote endpoint
+%%
+%% Websockets only support 2 types of data in the payload of a message: binary or text, so the type to apply
+%% to the data given as parameter to this will depend on the result of the BIFs is_binary and is_list. Parameters
+%% <ul>
+%% <li>Socket, a pid or atom. Handle to socket that is to be closed.</li>
+%% <li>Data, a string or binary. Data to be sent.</li>
+%% </ul>
+-spec send(Socket::pid()|atom(), Data::binary()|string()) -> ok.
+send(Socket, Data) ->
+  gen_fsm:send_event(Socket, {send, Data}).
 
 %% @doc Add a callback to be called when a connection is opened
 %%
@@ -86,7 +125,18 @@ send(Data) ->
 %% The callback function must be a function which takes no parameters
 -spec on_open(Callback::fun()) -> any().
 on_open(Callback) ->
-  gen_fsm:send_event(wsecli, {on_open, Callback}).
+  on_open(?DEFAULT_REG_NAME, Callback).
+
+%% @doc Add a callback to be called when a connection is opened
+%%
+%% This callback is called when the connection is opened (after a successful websocket handshake)
+%%or inmediatelly if called while in the open state. Adding it not it connecting or open state will
+%%raise an error.
+%%
+%% The callback function must be a function which takes no parameters
+-spec on_open(Socket::pid()|atom(), Callback::fun()) -> any().
+on_open(Socket, Callback) ->
+  gen_fsm:send_event(Socket, {on_open, Callback}).
 
 %% @doc Add a callback to be called when an error occurs
 %%
@@ -94,7 +144,15 @@ on_open(Callback) ->
 %%the error
 -spec on_error(Callback::fun()) -> any().
 on_error(Callback) ->
-  gen_fsm:send_all_state_event(wsecli, {on_error, Callback}).
+  on_error(?DEFAULT_REG_NAME, Callback).
+
+%% @doc Add a callback to be called when an error occurs
+%%
+%% The callback function must be a function which takes one parameter, the reason for
+%%the error
+-spec on_error(Socket::pid()|atom(), Callback::fun()) -> any().
+on_error(Socket, Callback) ->
+  gen_fsm:send_all_state_event(Socket, {on_error, Callback}).
 
 %% @doc Add a callback to be called when a message arrives
 %%
@@ -105,7 +163,18 @@ on_error(Callback) ->
 %% </ul>
 -spec on_message(Callback::fun()) -> any().
 on_message(Callback) ->
-  gen_fsm:send_all_state_event(wsecli, {on_message, Callback}).
+  on_message(?DEFAULT_REG_NAME, Callback).
+
+%% @doc Add a callback to be called when a message arrives
+%%
+%% The callback function must be a function which takes two parameters:
+%% <ul>
+%% <li> The first is an atom with values binary or text depending on the type of the websocket message</li>
+%% <li> The second parameter is the message payload</li>
+%% </ul>
+-spec on_message(Socket::atom()|pid(), Callback::fun()) -> any().
+on_message(Socket, Callback) ->
+  gen_fsm:send_all_state_event(Socket, {on_message, Callback}).
 
 %% @doc Add a callback to be called when then connection was closed
 %%
@@ -116,7 +185,18 @@ on_message(Callback) ->
 %%of the close message received from the remote endpoint (if any)
 -spec on_close(Callback::fun()) -> any().
 on_close(Callback) ->
-  gen_fsm:send_all_state_event(wsecli, {on_close, Callback}).
+  on_close(?DEFAULT_REG_NAME, Callback).
+
+%% @doc Add a callback to be called when then connection was closed
+%%
+%% This callback will be called when the connection is successfully closed, i.e. after performing the
+%%websocket closing handshake.
+%%
+%% The callback function must be a function which takes one parameter, the payload
+%%of the close message received from the remote endpoint (if any)
+-spec on_close(Socket::pid()|atom(), Callback::fun()) -> any().
+on_close(Socket, Callback) ->
+  gen_fsm:send_all_state_event(Socket, {on_close, Callback}).
 
 %%%%%%%%%%%%%%%%%%%%%
 %
@@ -128,7 +208,7 @@ on_close(Callback) ->
 init({Host, Port, Resource}) ->
   {ok, Socket} = gen_tcp:connect(Host, Port, [binary, {reuseaddr, true}, {packet, raw}] ),
 
-  Handshake = wsock_handshake:open(Resource, Host, Port),
+  {ok, Handshake} = wsock_handshake:open(Resource, Host, Port),
   Request = wsock_http:encode(Handshake#handshake.message),
 
   ok = gen_tcp:send(Socket, Request),
