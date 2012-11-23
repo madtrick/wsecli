@@ -19,7 +19,7 @@
 -module(wsecli).
 -behaviour(gen_fsm).
 
--include_lib("wsock/include/wsock.hrl").
+-include_lib("/home/konrad/src/wsecli/deps/wsock/include/wsock.hrl").
 
 -export([start/3, start/4, stop/0, stop/1, send/1, send/2]).
 -export([on_open/1, on_open/2, on_error/1, on_error/2, on_message/1, on_message/2, on_close/1, on_close/2]).
