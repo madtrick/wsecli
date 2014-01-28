@@ -5,7 +5,6 @@ wsecli
 
 A WebSocket client written in Erlang
 
-* [Disclaimer](#disclaimer)
 * [Supported WebSocket version](#versions)
 * [Build](#build)
 * [Usage](#usage)
@@ -13,16 +12,6 @@ A WebSocket client written in Erlang
 * [TODO](#todo)
 * [License](#license)
 * [Contribute](#contribute)
-
-This project was born as a side project while I'm doing my end of dregree project. What this means is:
-
-  * I don't have too much time to include new features.
-
-But,
-
-  * I'll try to fix any bugs.
-  * I'll try to finish anything on the TODO.
-  * If anyone suggests something interesting/cool, I'll try to include it : )
 
 ### Features <a name="features"> ###
   * Built using [wsock](https://github.com/madtrick/wsock)
@@ -96,14 +85,23 @@ Unit test where done with the library [_espec_](https://github.com/lucaspiller/e
 ### TODO <a name="todo">
 
 * Accept WebSocket uris (those with ws:// format).
-* Support streaming (not sure how to do this).
+* Support streaming of data.
 * Support ssl.
-* Creation on multiple clients (too lazy, that's why I haven't done it already)
+* Creation on multiple clients.
 
+###Author
+Farruco Sanjurjo. You can contact me at:
+
+* Twitter [@madtrick](https://twitter.com/madtrick)
+* Mail madtrick@gmail.com
 
 ### License <a name="installation">
 
-Licensed under Apache 2.0. Check LICENSE for details
+Copyright [2013] [Farruco Sanjurjo Arcay]
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0 Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
 
 ### Contribute <a name="contribute">
 
