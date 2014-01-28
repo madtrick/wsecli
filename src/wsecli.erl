@@ -108,20 +108,19 @@ stop(Client) ->
 %%
 %% This is the same as calling {@link send/2} with the atom `wsecli' (see {@link start/3}) as first parameter
 -spec send(
-    Data::string()
-  ) -> ok;
-  (
-    Data::binary()
+  Data :: binary() | string()
   ) -> ok.
 send(Data) ->
   send(?DEFAULT_REG_NAME, Data).
 
 %% @doc Send data to a remote endpoint
 %%
-%% This is the same as calling {@link send/3} whit the third parameter being the type of the Data sent.
+%% This is the same as calling {@link send/3} whit the third parameter being the type of the Data sent. The type will
+%% determined by `is_binary' and `is_list' NIFs. So if you want to send a `text' message which is stored in a binary value you
+%% will have to use {@link send/3} and specify the type as `text'. Otherwise it will be sent as `binary' type
 -spec send(
   Client :: client_name(),
-  Data :: binary()|string()
+  Data   :: binary() | string()
   ) -> ok.
 send(Client, Data) when is_binary(Data) ->
   send(Client, Data, binary);
