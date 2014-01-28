@@ -21,7 +21,7 @@
 
 -include_lib("wsock/include/wsock.hrl").
 
--export([start/3, start/4, stop/0, stop/1, send/1, send/2]).
+-export([start/3, start/4, stop/0, stop/1, send/1, send/2, send/3]).
 -export([on_open/1, on_open/2, on_error/1, on_error/2, on_message/1, on_message/2, on_close/1, on_close/2]).
 -export([init/1, connecting/2, open/2, closing/2]).
 -export([handle_event/3, handle_sync_event/4, handle_info/3, terminate/3, code_change/4]).
@@ -39,6 +39,15 @@
     fragmented_message = undefined :: #message{}
   }).
 
+%%========================================
+%% Types
+%%========================================
+-type encoding() :: text | binary.
+-type client_name() :: {local, atom()} | {global, atom()} | anon.
+
+%%========================================
+%% Constants
+%%========================================
 -define(CLOSE_HANDSHAKE_TIMEOUT, 2000).
 -define(TCP_CLOSE_TIMEOUT, 500).
 -define(DEFAULT_REG_NAME, ?MODULE).
@@ -49,28 +58,27 @@
 %
 %%%%%%%%%%%%%%%%%%%%%
 
-%% @doc This function will start the websocket client
+%% @doc Start the websocket client
 %%
-%% This function will open a connection with the specified remote endpoint. Parameters
-%% <ul>
-%% <li>Host, a string. The URL of the remote endpoint</li>
-%% <li>Port, an integer. The port where the remote endpoint is listening</li>
-%% <li>Resouce, an string. The resource path where the websockets live</li>
-%% </ul>
--spec start(Host::string(), Port::integer(), Resource::string()) -> pid().
+%% This is the same as calling {@link start/4} with the atom `wsecli' as its fourth parameter.
+-spec start(
+  Host :: string(),
+  Port :: inet:port_number(),
+  Resource :: string()
+  ) -> pid().
 start(Host, Port, Path) ->
     start(Host, Port, Path, {local, ?DEFAULT_REG_NAME}).
 
-%% @doc This function will start the websocket client
+%% @doc Start the websocket client
 %%
-%% This function will open a connection with the specified remote endpoint. Parameters
-%% <ul>
-%% <li>Host, a string. The URL of the remote endpoint</li>
-%% <li>Port, an integer. The port where the remote endpoint is listening</li>
-%% <li>Resouce, an string. The resource path where the websockets live</li>
-%% <li>FsmName, a tuple or 'anon'. 'anon' will skip registering process. See also <a href="http://www.erlang.org/doc/man/gen_fsm.html#start_link-3">here</a></li>
-%% </ul>
--spec start(Host::string(), Port::integer(), Resource::string(), FsmName::tuple()|atom()) -> pid().
+%% This function will open a connection with the specified remote endpoint building an URL like `ws://Host:PortResource'.
+%% If the atom `anon' is given as the FsmName, the client will not be registered.
+-spec start(
+  Host     :: string(),
+  Port     :: inet:port_number(),
+  Resource :: string(),
+  FsmName  :: client_name()
+  ) -> pid().
 start(Host, Port, Path, anon) ->
   gen_fsm:start_link(?MODULE, {Host, Port, Path}, [{timeout, 5000}]);
 start(Host, Port, Path, FsmName) ->
@@ -97,24 +105,41 @@ stop(Socket) ->
 
 %% @doc Send data to a remote endpoint
 %%
-%% Websockets only support 2 types of data in the payload of a message: binary or text, so the type to apply
-%%to the data given as parameter to this will depend on the result of the BIFs is_binary and is_list
--spec send(Data::string()) -> ok;
-          (Data::binary()) -> ok.
+%% This is the same as calling {@link send/2} with the atom `wsecli' (see {@link start/3}) as first parameter
+%%
+-spec send(
+    Data::string()
+  ) -> ok;
+  (
+    Data::binary()
+  ) -> ok.
 send(Data) ->
   send(?DEFAULT_REG_NAME, Data).
 
 %% @doc Send data to a remote endpoint
 %%
-%% Websockets only support 2 types of data in the payload of a message: binary or text, so the type to apply
-%% to the data given as parameter to this will depend on the result of the BIFs is_binary and is_list. Parameters
-%% <ul>
-%% <li>Socket, a pid or atom. Handle to socket that is to be closed.</li>
-%% <li>Data, a string or binary. Data to be sent.</li>
-%% </ul>
--spec send(Socket::pid()|atom(), Data::binary()|string()) -> ok.
-send(Socket, Data) ->
-  gen_fsm:send_event(Socket, {send, Data}).
+%% This is the same as calling {@link send/3} whit the third parameter being the type of the Data sent.
+%%
+-spec send(
+  Socket :: pid() | atom(),
+  Data :: binary()|string()
+  ) -> ok.
+send(Socket, Data) when is_binary(Data) ->
+  send(Socket, Data, binary);
+send(Socket, Data) when is_list(Data) ->
+  send(Socket, Data, text).
+
+%% @doc Send data to a remote endpoint
+%%
+%% Sends data using the specified wsecli client, encoding the data as the give type.
+%%
+-spec send(
+  Socket :: pid() | atom(),
+  Data :: binary() | string(),
+  Type :: encoding()
+  ) -> ok.
+send(Socket, Data, Type) ->
+  gen_fsm:send_event(Socket, {send, Data, Type}).
 
 %% @doc Add a callback to be called when a connection is opened
 %%
@@ -231,8 +256,8 @@ open({on_open, Callback}, StateData) ->
   spawn(Callback),
   {next_state, open, StateData};
 
-open({send, Data}, StateData) ->
-  Message = wsock_message:encode(Data, [mask, text]),
+open({send, Data, Type}, StateData) ->
+  Message = wsock_message:encode(Data, [mask, Type]),
   case gen_tcp:send(StateData#data.socket, Message) of
     ok ->
       ok;
