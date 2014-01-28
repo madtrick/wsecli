@@ -42,8 +42,13 @@
 %%========================================
 %% Types
 %%========================================
--type encoding() :: text | binary.
--type client_name() :: {local, atom()} | {global, atom()} | anon.
+-type encoding()            :: text | binary.
+-type client_name()         :: {local, atom()} | {global, atom()} | anon.
+-type on_open_callback()    :: fun(() -> any()).
+-type on_error_callback()   :: fun((Error :: string()) -> any()).
+-type data_callback() :: fun((text, Payload :: string()) -> any() )| fun((binary, Payload :: binary()) -> any()).
+-type on_message_callback() :: data_callback().
+-type on_close_callback()   :: data_callback().
 
 %%========================================
 %% Constants
@@ -52,11 +57,9 @@
 -define(TCP_CLOSE_TIMEOUT, 500).
 -define(DEFAULT_REG_NAME, ?MODULE).
 
-%%%%%%%%%%%%%%%%%%%%%
-%
-% PUBLIC API
-%
-%%%%%%%%%%%%%%%%%%%%%
+%%========================================
+%% Public API
+%%========================================
 
 %% @doc Start the websocket client
 %%
@@ -72,41 +75,38 @@ start(Host, Port, Path) ->
 %% @doc Start the websocket client
 %%
 %% This function will open a connection with the specified remote endpoint building an URL like `ws://Host:PortResource'.
-%% If the atom `anon' is given as the FsmName, the client will not be registered.
+%% If the atom `anon' is given as the ClientName, the client will not be registered.
 -spec start(
   Host     :: string(),
   Port     :: inet:port_number(),
   Resource :: string(),
-  FsmName  :: client_name()
+  ClientName  :: client_name()
   ) -> pid().
 start(Host, Port, Path, anon) ->
   gen_fsm:start_link(?MODULE, {Host, Port, Path}, [{timeout, 5000}]);
-start(Host, Port, Path, FsmName) ->
-  gen_fsm:start_link(FsmName, ?MODULE, {Host, Port, Path}, [{timeout, 5000}]).
+start(Host, Port, Path, ClientName) ->
+  gen_fsm:start_link(ClientName, ?MODULE, {Host, Port, Path}, [{timeout, 5000}]).
 
-%% @doc This function will stop the websocket client
+%% @doc Stop the websocket client
 %%
-%% Calling this function doesn't mean that the connection will be inmediatelly closed. A
-%%closing handshake is tryed and only after that the connection is closed.
+%% This is the same as calling {@link stop/1} with the atom `wsecli' as a parameter.
 -spec stop() -> ok.
 stop() ->
   stop(?DEFAULT_REG_NAME).
 
-%% @doc This function will stop the websocket client
+%% @doc Stop the websocket client
 %%
 %% Calling this function doesn't mean that the connection will be inmediatelly closed. A
-%% closing handshake is tryed and only after that the connection is closed. Parameters
-%% <ul>
-%% <li>Socket, a pid or atom. Handle to socket that is to be closed.</li>
-%% </ul>
--spec stop(Socket::pid()|atom()) -> ok.
-stop(Socket) ->
-  gen_fsm:sync_send_all_state_event(Socket, stop).
+%% closing handshake is tryed and only after that the connection is closed and the client stopped.
+-spec stop(
+  Client :: client_name()
+  ) -> ok.
+stop(Client) ->
+  gen_fsm:sync_send_all_state_event(Client, stop).
 
 %% @doc Send data to a remote endpoint
 %%
 %% This is the same as calling {@link send/2} with the atom `wsecli' (see {@link start/3}) as first parameter
-%%
 -spec send(
     Data::string()
   ) -> ok;
@@ -119,96 +119,87 @@ send(Data) ->
 %% @doc Send data to a remote endpoint
 %%
 %% This is the same as calling {@link send/3} whit the third parameter being the type of the Data sent.
-%%
 -spec send(
-  Socket :: pid() | atom(),
+  Client :: client_name(),
   Data :: binary()|string()
   ) -> ok.
-send(Socket, Data) when is_binary(Data) ->
-  send(Socket, Data, binary);
-send(Socket, Data) when is_list(Data) ->
-  send(Socket, Data, text).
+send(Client, Data) when is_binary(Data) ->
+  send(Client, Data, binary);
+send(Client, Data) when is_list(Data) ->
+  send(Client, Data, text).
 
 %% @doc Send data to a remote endpoint
 %%
-%% Sends data using the specified wsecli client, encoding the data as the give type.
-%%
+%% Sends data using the specified client, encoding the data as the give type.
 -spec send(
-  Socket :: pid() | atom(),
+  Client :: client_name(),
   Data :: binary() | string(),
   Type :: encoding()
   ) -> ok.
-send(Socket, Data, Type) ->
-  gen_fsm:send_event(Socket, {send, Data, Type}).
+send(Client, Data, Type) ->
+  gen_fsm:send_event(Client, {send, Data, Type}).
 
 %% @doc Add a callback to be called when a connection is opened
 %%
-%% This callback is called when the connection is opened (after a successful websocket handshake)
-%%or inmediatelly if called while in the open state. Adding it not it connecting or open state will
-%%raise an error.
-%%
-%% The callback function must be a function which takes no parameters
--spec on_open(Callback::fun()) -> any().
+%% This is the same as calling {@link on_open/2} with the atom `wsecli' as first parameter.
+-spec on_open(
+  Callback :: on_open_callback()
+  ) -> any().
 on_open(Callback) ->
   on_open(?DEFAULT_REG_NAME, Callback).
 
 %% @doc Add a callback to be called when a connection is opened
 %%
-%% This callback is called when the connection is opened (after a successful websocket handshake)
-%%or inmediatelly if called while in the open state. Adding it not it connecting or open state will
+%% This callback will be called when the connection is opened (after a successful websocket handshake)
+%%or inmediatelly if added while in the open state. Adding it in any other state will
 %%raise an error.
-%%
-%% The callback function must be a function which takes no parameters
--spec on_open(Socket::pid()|atom(), Callback::fun()) -> any().
-on_open(Socket, Callback) ->
-  gen_fsm:send_event(Socket, {on_open, Callback}).
+-spec on_open(
+  Client   :: client_name(),
+  Callback :: on_open_callback()
+  ) -> any().
+on_open(Client, Callback) ->
+  gen_fsm:send_event(Client, {on_open, Callback}).
 
 %% @doc Add a callback to be called when an error occurs
 %%
-%% The callback function must be a function which takes one parameter, the reason for
-%%the error
--spec on_error(Callback::fun()) -> any().
+%% This is the same as calling {@link on_error/2} with the atom `wsecli' as the first parameter.
+-spec on_error(
+  Callback :: on_error_callback()
+  ) -> any().
 on_error(Callback) ->
   on_error(?DEFAULT_REG_NAME, Callback).
 
 %% @doc Add a callback to be called when an error occurs
-%%
-%% The callback function must be a function which takes one parameter, the reason for
-%%the error
--spec on_error(Socket::pid()|atom(), Callback::fun()) -> any().
-on_error(Socket, Callback) ->
-  gen_fsm:send_all_state_event(Socket, {on_error, Callback}).
+-spec on_error(
+  Client   :: client_name(),
+  Callback :: on_error_callback()
+  ) -> any().
+on_error(Client, Callback) ->
+  gen_fsm:send_all_state_event(Client, {on_error, Callback}).
 
 %% @doc Add a callback to be called when a message arrives
 %%
-%% The callback function must be a function which takes two parameters:
-%% <ul>
-%% <li> The first is an atom with values binary or text depending on the type of the websocket message</li>
-%% <li> The second parameter is the message payload</li>
-%% </ul>
--spec on_message(Callback::fun()) -> any().
+%% This is the same as calling {@link on_message/2} with the atom `wsecli' as the first parameter.
+-spec on_message(
+  Callback :: on_message_callback()
+  ) -> any().
 on_message(Callback) ->
   on_message(?DEFAULT_REG_NAME, Callback).
 
 %% @doc Add a callback to be called when a message arrives
-%%
-%% The callback function must be a function which takes two parameters:
-%% <ul>
-%% <li> The first is an atom with values binary or text depending on the type of the websocket message</li>
-%% <li> The second parameter is the message payload</li>
-%% </ul>
--spec on_message(Socket::atom()|pid(), Callback::fun()) -> any().
-on_message(Socket, Callback) ->
-  gen_fsm:send_all_state_event(Socket, {on_message, Callback}).
+-spec on_message(
+  Client   :: client_name(),
+  Callback :: on_message_callback()
+  ) -> any().
+on_message(Client, Callback) ->
+  gen_fsm:send_all_state_event(Client, {on_message, Callback}).
 
 %% @doc Add a callback to be called when then connection was closed
 %%
-%% This callback will be called when the connection is successfully closed, i.e. after performing the
-%%websocket closing handshake.
-%%
-%% The callback function must be a function which takes one parameter, the payload
-%%of the close message received from the remote endpoint (if any)
--spec on_close(Callback::fun()) -> any().
+%% This is the same as calling {@link on_close/2} with the atom `wsecli' as the first parameter.
+-spec on_close(
+  Callback :: on_close_callback()
+  ) -> any().
 on_close(Callback) ->
   on_close(?DEFAULT_REG_NAME, Callback).
 
@@ -216,20 +207,20 @@ on_close(Callback) ->
 %%
 %% This callback will be called when the connection is successfully closed, i.e. after performing the
 %%websocket closing handshake.
-%%
-%% The callback function must be a function which takes one parameter, the payload
-%%of the close message received from the remote endpoint (if any)
--spec on_close(Socket::pid()|atom(), Callback::fun()) -> any().
-on_close(Socket, Callback) ->
-  gen_fsm:send_all_state_event(Socket, {on_close, Callback}).
+-spec on_close(
+  Client   :: client_name(),
+  Callback :: on_close_callback()
+  )-> any().
+on_close(Client, Callback) ->
+  gen_fsm:send_all_state_event(Client, {on_close, Callback}).
 
-%%%%%%%%%%%%%%%%%%%%%
-%
-% GEN FSM STATENAME FUNCTIONS
-%
-%%%%%%%%%%%%%%%%%%%%%
+%%========================================
+%% Gen FSM functions
+%%========================================
 %% @hidden
--spec init({Host::string(), Port::integer(), Resource::string()}) -> {ok, connecting, #data{}}.
+-spec init(
+  {Host::string(), Port::integer(), Resource::string()}
+  ) -> {ok, connecting, #data{}}.
 init({Host, Port, Resource}) ->
   {ok, Socket} = gen_tcp:connect(Host, Port, [binary, {reuseaddr, true}, {packet, raw}] ),
 
