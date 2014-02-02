@@ -26,7 +26,7 @@ Please notice that currently, neither _subprotocols_ nor _extensions_ are curren
 Add this repo as a dependency to your rebar.config file and then
 
   ```bash
-  rebar compile
+  ./rebar compile
   ```
 
 ### Usage <a name="usage">###
@@ -79,7 +79,7 @@ Unit test where done with the library [_espec_](https://github.com/lucaspiller/e
   or, in case you don't have rake installed,
 
   ```bash
-  rebar compile && ERL_LIBS='deps/' ./espec test/spec/
+  ./rebar compile && ERL_LIBS='deps/' ./espec test/spec/
   ```
 
 ### TODO <a name="todo">
