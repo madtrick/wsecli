@@ -1,5 +1,8 @@
 #Change Log
 
+### 0.2.1
+  * Don't do builds for R14B0X in Travis as they are broken.
+
 ### 0.2.0
   * Ensure the version for the dependencies using wether a git-tag or a commit sha1.
 
