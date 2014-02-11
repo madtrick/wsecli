@@ -305,13 +305,13 @@ handle_sync_event(stop, _From, open, StateData) ->
     ok ->
       gen_fsm:start_timer(?CLOSE_HANDSHAKE_TIMEOUT, waiting_close_reply),
       {reply, {ok, closing}, closing, StateData};
-    {error, Reason} ->
+    {error, _Reason} ->
       {stop, socket_error, {error, socket_error}, StateData }
   end.
 
 %% @hidden
 -spec handle_info({tcp, Socket::gen_tcp:socket(), Data::binary()}, connecting, #data{}) -> {next_state, atom(), #data{}}.
-handle_info({tcp, Socket, Data}, connecting, StateData) ->
+handle_info({tcp, _Socket, Data}, connecting, StateData) ->
   {ok, Response} = wsock_http:decode(Data, response),
   case wsock_handshake:handle_response(Response, StateData#data.handshake) of
     {ok, _Handshake} ->
@@ -321,7 +321,7 @@ handle_info({tcp, Socket, Data}, connecting, StateData) ->
       {stop, failed_handshake, StateData}
   end;
 
-handle_info({tcp, Socket, Data}, open, StateData) ->
+handle_info({tcp, _Socket, Data}, open, StateData) ->
   {Messages, State} = case StateData#data.fragmented_message of
     undefined ->
       {wsock_message:decode(Data, []), StateData};
@@ -331,7 +331,7 @@ handle_info({tcp, Socket, Data}, open, StateData) ->
   NewStateData = process_messages(Messages, State),
   {next_state, open, NewStateData};
 
-handle_info({tcp, Socket, Data}, closing, StateData) ->
+handle_info({tcp, _Socket, Data}, closing, StateData) ->
   [Message] = wsock_message:decode(Data, []),
   case Message#message.type of
     close ->
@@ -353,7 +353,7 @@ terminate(_Reason, _StateName, StateData) ->
   spawn(fun() -> (StateData#data.cb#callbacks.on_close)(undefined) end).
 
 %% @hidden
-code_change(OldVsn, StateName, StateData, Extra) ->
+code_change(_OldVsn, StateName, StateData, _Extra) ->
   {ok, StateName, StateData}.
 
 %%%%%%%%%%%%%%%%%%%%%
