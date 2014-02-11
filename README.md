@@ -1,11 +1,10 @@
-[![Analytics](https://ga-beacon.appspot.com/UA-46795389-1/wsecli/README)](https://github.com/igrigorik/ga-beacon)
+[![Analytics](https://ga-beacon.appspot.com/UA-46795389-1/wsecli/README)](https://github.com/igrigorik/ga-beacon) [![Build Status](https://travis-ci.org/madtrick/wsecli.png)](https://travis-ci.org/madtrick/wsecli)
 
 
 wsecli
 ======
 
-A WebSocket client written in Erlang 
-[![Build Status](https://travis-ci.org/madtrick/e_e.png?branch=master)](https://travis-ci.org/madtrick/wsecli)
+A WebSocket client written in Erlang
 
 * [Supported WebSocket version](#versions)
 * [Build](#build)
