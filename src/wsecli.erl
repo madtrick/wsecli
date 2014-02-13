@@ -85,7 +85,7 @@ start(Host, Port, Path) ->
 start(Host, Port, Path, anon) ->
   gen_fsm:start_link(?MODULE, {Host, Port, Path}, [{timeout, 5000}]);
 start(Host, Port, Path, ClientName) ->
-  gen_fsm:start_link(ClientName, ?MODULE, {Host, Port, Path}, [{timeout, 5000}]).
+  gen_fsm:start_link(ClientName, ?DEFAULT_REG_NAME, {Host, Port, Path}, [{timeout, 5000}]).
 
 %% @doc Stop the websocket client
 %%
