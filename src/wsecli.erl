@@ -21,7 +21,7 @@
 
 -include_lib("wsock/include/wsock.hrl").
 
--export([start/3, start/4, stop/0, stop/1, send/1, send/2, send/3]).
+-export([start/1, start/3, start/4, stop/0, stop/1, send/1, send/2, send/3]).
 -export([on_open/1, on_open/2, on_error/1, on_error/2, on_message/1, on_message/2, on_close/1, on_close/2]).
 -export([init/1, connecting/2, open/2, closing/2]).
 -export([handle_event/3, handle_sync_event/4, handle_info/3, terminate/3, code_change/4]).
@@ -60,6 +60,20 @@
 %%========================================
 %% Public API
 %%========================================
+
+%% @doc Start the websocket client.
+%%
+%% This function will open a connection with the specified remote endpoint.
+-spec start(
+  URI :: string()
+  ) -> {ok, pid()}.
+start(URI) ->
+  case http_uri:parse(URI) of
+    {ok, {_Scheme, _, Host, Port, Path, Query}} ->
+      start(Host, Port, string:concat(Path, Query));
+    {error, Reason} ->
+      {error, Reason}
+  end.
 
 %% @doc Start the websocket client
 %%
