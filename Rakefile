@@ -7,7 +7,7 @@ task :build => :clean do
 end
 
 task :shell do
-  sh "erl -pa ebin deps/*/ebin"
+  sh "erl -pa ebin deps/*/ebin -s reloader"
 end
 
 task :features do
