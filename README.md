@@ -1,4 +1,4 @@
-[![Analytics](https://ga-beacon.appspot.com/UA-46795389-1/wsecli/README)](https://github.com/igrigorik/ga-beacon) [![Build Status](https://travis-ci.org/madtrick/wsecli.png)](https://travis-ci.org/madtrick/wsecli)
+<!--[![Analytics](https://ga-beacon.appspot.com/UA-46795389-1/wsecli/README)](https://github.com/igrigorik/ga-beacon) [![Build Status](https://travis-ci.org/madtrick/wsecli.png)](https://travis-ci.org/madtrick/wsecli)-->
 
 
 wsecli
@@ -35,12 +35,18 @@ Add this repo as a dependency to your rebar.config file and then
 I will demostrate its usage with the echo service at [www.websocket.org](http://www.websocket.org/echo.html).
 
 
-Start it,
+1. Start it, using the function ```wsecli:start/4```
 
 
-  ```erlang
-  1>wsecli:start("echo.websocket.org", 80, "/").
-  ```
+   ```erlang
+   1>wsecli:start("echo.websocket.org", 80, "/", []).
+   ```
+   
+   or the function ```wsecli:start/2```
+   
+   ```erlang
+   2>wsecli:start("ws://echo.websocket.org:80/", []).
+   ```
 
 Add a callback for received messages,
 
@@ -62,9 +68,12 @@ And finally to stop it
   4>wsecli:stop().
   ```
 
+
 #### Callbacks
 
 Callbacks for the events: *on_open*, *on_error*, *on_message* and *on_close* can be added. Check the code or the documentation for details.
+
+
 
 ### Tests <a name="tests">
 
@@ -85,10 +94,8 @@ Unit test where done with the library [_espec_](https://github.com/lucaspiller/e
 
 ### TODO <a name="todo">
 
-* Accept WebSocket uris (those with ws:// format).
 * Support streaming of data.
 * Support ssl.
-* Creation on multiple clients.
 
 ###Author
 Farruco Sanjurjo. You can contact me at:

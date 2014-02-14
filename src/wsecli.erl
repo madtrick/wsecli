@@ -56,6 +56,7 @@
 -define(CLOSE_HANDSHAKE_TIMEOUT, 2000).
 -define(TCP_CLOSE_TIMEOUT, 500).
 -define(DEFAULT_REG_NAME, ?MODULE).
+-define(DEFAULT_PORT_WS, 80).
 
 %%========================================
 %% Public API
@@ -65,6 +66,7 @@
 %%
 %% This function will open a connection with the specified remote endpoint.
 %%
+%% If the option `ssl' is given it will be overwritten by the scheme type of the URI.
 -spec start(
   URI     :: string(),
   Options :: list({atom(), any()})
@@ -72,9 +74,14 @@
   {error, any()} |
   {ok, pid()}.
 start(URI, Options) ->
-  case http_uri:parse(URI) of
+  case http_uri:parse(URI, [{scheme_defaults, [{ws, ?DEFAULT_PORT_WS}]}]) of
     {ok, {Scheme, _, Host, Port, Path, Query}} ->
-      start(Host, Port, string:concat(Path, Query), Options);
+      UseSSL = case Scheme of
+        ws  -> false;
+        wss -> true
+      end,
+      UpdatedOptions = [{ssl, UseSSL} | proplists:delete(ssl, Options)],
+      start(Host, Port, string:concat(Path, Query), UpdatedOptions);
     {error, Reason} ->
       {error, Reason}
   end.
@@ -87,12 +94,15 @@ start(URI, Options) ->
 %%
 %% <dl>
 %%
+%%  <dt>`ssl'</dt>
+%%  <dd>Connect to the server using ssl or not. Values: `true' or `false'</dd>
+%%
 %%  <dt>`register'</dt>
 %%  <dd>Register the client in the Erlang runtime. Values: `true' to register using the default name `wsecli', `false' to not register and any other atom to register it with other name</dd>
 %%
 %% </dl>
 %%
-%% If no options are given the process will not be registered.
+%% If no options are given the process will not be registered and it will not try to connect using SSL.
 -spec start(
   Host     :: string(),
   Port     :: inet:port_number(),
@@ -100,8 +110,9 @@ start(URI, Options) ->
   Options  :: list({atom(), any()})
 ) -> {ok, pid()}.
 start(Host, Port, Path, Options) ->
+  UseSSL        = proplists:get_value(ssl, Options, false),
   GenOptions    = [{timeout, 5000}],
-  ClientOptions = {Host, Port, Path},
+  ClientOptions = {Host, Port, Path, UseSSL},
   case proplists:get_value(register, Options, false) of
       false ->
         gen_fsm:start_link(?MODULE, ClientOptions, GenOptions);
@@ -246,10 +257,11 @@ on_close(Client, Callback) ->
   {
     Host     :: string(),
     Port     :: integer(),
-    Resource :: string()
+    Resource :: string(),
+    SSL      :: boolean()
   }
   ) -> {ok, connecting, #data{}}.
-init({Host, Port, Resource}) ->
+init({Host, Port, Resource, SSL}) ->
   {ok, Socket} = gen_tcp:connect(Host, Port, [binary, {reuseaddr, true}, {packet, raw}] ),
 
   {ok, Handshake} = wsock_handshake:open(Resource, Host, Port),
