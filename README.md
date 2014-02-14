@@ -1,4 +1,4 @@
-<!--[![Analytics](https://ga-beacon.appspot.com/UA-46795389-1/wsecli/README)](https://github.com/igrigorik/ga-beacon) [![Build Status](https://travis-ci.org/madtrick/wsecli.png)](https://travis-ci.org/madtrick/wsecli)-->
+[![Analytics](https://ga-beacon.appspot.com/UA-46795389-1/wsecli/README)](https://github.com/igrigorik/ga-beacon) [![Build Status](https://travis-ci.org/madtrick/wsecli.png)](https://travis-ci.org/madtrick/wsecli)
 
 
 wsecli
@@ -45,28 +45,33 @@ I will demostrate its usage with the echo service at [www.websocket.org](http://
    or the function ```wsecli:start/2```
    
    ```erlang
-   2>wsecli:start("ws://echo.websocket.org:80/", []).
+   2>wsecli:start("ws://echo.websocket.org/", []).
    ```
+   
+   The valid options for the client are:
+   
+   	  * {registered, true | false | atom()}. When *true* the client will be registered using the default name *wsecli*, when *false* it will not be registered and any other atom will be used as the name to register with. By default it will not be registered.
+   	  
+   	  
+2. Add a callback for received messages,
 
-Add a callback for received messages,
+  	```erlang
+  	2>wsecli:on_message(fun(text, Message)-> io:format("Echoed message: ~s ~n", [Message]) end).
+  	```
 
-  ```erlang
-  2>wsecli:on_message(fun(text, Message)-> io:format("Echoed message: ~s ~n", [Message]) end).
-  ```
+3. Send a message that will be echoed,
 
-Send a message that will be echoed,
+  	```erlang
+  	3> wsecli:send("Hello").
+  	ok
+  	Echoed message: Hello
+  	```
 
-  ```erlang
-  3> wsecli:send("Hello").
-  ok
-  Echoed message: Hello
-  ```
+4. And finally to stop it
 
-And finally to stop it
-
-  ```erlang
-  4>wsecli:stop().
-  ```
+  	```erlang
+  	4>wsecli:stop().
+  	```
 
 
 #### Callbacks
@@ -86,7 +91,9 @@ Unit test where done with the library [_espec_](https://github.com/lucaspiller/e
   ```bash
   rake spec
   ```
+  
   or, in case you don't have rake installed,
+  
 
   ```bash
   ./rebar compile && ERL_LIBS='deps/' ./espec test/spec/
