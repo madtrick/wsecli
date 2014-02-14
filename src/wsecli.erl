@@ -21,7 +21,7 @@
 
 -include_lib("wsock/include/wsock.hrl").
 
--export([start/1, start/3, start/4, stop/0, stop/1, send/1, send/2, send/3]).
+-export([start/2, start/4, stop/0, stop/1, send/1, send/2, send/3]).
 -export([on_open/1, on_open/2, on_error/1, on_error/2, on_message/1, on_message/2, on_close/1, on_close/2]).
 -export([init/1, connecting/2, open/2, closing/2]).
 -export([handle_event/3, handle_sync_event/4, handle_info/3, terminate/3, code_change/4]).
@@ -64,42 +64,53 @@
 %% @doc Start the websocket client.
 %%
 %% This function will open a connection with the specified remote endpoint.
+%%
 -spec start(
-  URI :: string()
-  ) -> {ok, pid()}.
-start(URI) ->
+  URI     :: string(),
+  Options :: list({atom(), any()})
+  ) ->
+  {error, any()} |
+  {ok, pid()}.
+start(URI, Options) ->
   case http_uri:parse(URI) of
-    {ok, {_Scheme, _, Host, Port, Path, Query}} ->
-      start(Host, Port, string:concat(Path, Query));
+    {ok, {Scheme, _, Host, Port, Path, Query}} ->
+      start(Host, Port, string:concat(Path, Query), Options);
     {error, Reason} ->
       {error, Reason}
   end.
 
-%% @doc Start the websocket client
-%%
-%% This is the same as calling {@link start/4} with the atom `wsecli' as its fourth parameter.
--spec start(
-  Host :: string(),
-  Port :: inet:port_number(),
-  Resource :: string()
-  ) -> pid().
-start(Host, Port, Path) ->
-    start(Host, Port, Path, {local, ?DEFAULT_REG_NAME}).
 
 %% @doc Start the websocket client
 %%
 %% This function will open a connection with the specified remote endpoint building an URL like `ws://Host:PortResource'.
-%% If the atom `anon' is given as the ClientName, the client will not be registered.
+%% The options to this method can be the following:
+%%
+%% <dl>
+%%
+%%  <dt>`register'</dt>
+%%  <dd>Register the client in the Erlang runtime. Values: `true' to register using the default name `wsecli', `false' to not register and any other atom to register it with other name</dd>
+%%
+%% </dl>
+%%
+%% If no options are given the process will not be registered.
 -spec start(
   Host     :: string(),
   Port     :: inet:port_number(),
   Resource :: string(),
-  ClientName  :: client_name()
-  ) -> pid().
-start(Host, Port, Path, anon) ->
-  gen_fsm:start_link(?MODULE, {Host, Port, Path}, [{timeout, 5000}]);
-start(Host, Port, Path, ClientName) ->
-  gen_fsm:start_link(ClientName, ?DEFAULT_REG_NAME, {Host, Port, Path}, [{timeout, 5000}]).
+  Options  :: list({atom(), any()})
+) -> {ok, pid()}.
+start(Host, Port, Path, Options) ->
+  GenOptions    = [{timeout, 5000}],
+  ClientOptions = {Host, Port, Path},
+  case proplists:get_value(register, Options, false) of
+      false ->
+        gen_fsm:start_link(?MODULE, ClientOptions, GenOptions);
+      true ->
+        gen_fsm:start_link({local, ?DEFAULT_REG_NAME}, ?MODULE, ClientOptions, GenOptions);
+      Name ->
+        gen_fsm:start_link({local, Name}, ?MODULE, ClientOptions, GenOptions)
+    end.
+
 
 %% @doc Stop the websocket client
 %%
@@ -232,7 +243,11 @@ on_close(Client, Callback) ->
 %%========================================
 %% @hidden
 -spec init(
-  {Host::string(), Port::integer(), Resource::string()}
+  {
+    Host     :: string(),
+    Port     :: integer(),
+    Resource :: string()
+  }
   ) -> {ok, connecting, #data{}}.
 init({Host, Port, Resource}) ->
   {ok, Socket} = gen_tcp:connect(Host, Port, [binary, {reuseaddr, true}, {packet, raw}] ),
