@@ -16,19 +16,25 @@ A WebSocket client written in Erlang
 
 ### Features <a name="features"> ###
   * Built using [wsock](https://github.com/madtrick/wsock)
+  * Supports both "ws://" and "wss://" schemes.
+  * Offers callbacks for events that might occur during the client life: ```on_open```, ```on_close```, ```on_message``` and ```on_error```.
 
 ### Supported protocol versions <a name="versions"/> ###
-Currently only the version specificied at [RFC6455](http://tools.ietf.org/html/rfc6455) (version 13) is supported.
-
-Please notice that currently, neither _subprotocols_ nor _extensions_ are currently available.
+Only the protocol specificied at [RFC6455](http://tools.ietf.org/html/rfc6455) (version 13) is supported. Notice that currently, neither _subprotocols_ nor _extensions_ are supported.
 
 ### Build <a name="build">###
 
-Add this repo as a dependency to your rebar.config file and then
+Add this repo as a dependency to your rebar.config file
 
-  ```bash
-  ./rebar compile
-  ```
+```erlang
+{wsecli, ".*", {git, "https://github.com/madtrick/wsecli", {tag, master}}}
+```
+
+and then
+
+```bash
+./rebar compile
+```
 
 ### Usage <a name="usage">###
 
@@ -56,13 +62,13 @@ I will demostrate its usage with the echo service at [www.websocket.org](http://
 2. Add a callback for received messages,
 
   	```erlang
-  	2>wsecli:on_message(fun(text, Message)-> io:format("Echoed message: ~s ~n", [Message]) end).
+  	3>wsecli:on_message(fun(text, Message)-> io:format("Echoed message: ~s ~n", [Message]) end).
   	```
 
 3. Send a message that will be echoed,
 
   	```erlang
-  	3> wsecli:send("Hello").
+  	4> wsecli:send("Hello").
   	ok
   	Echoed message: Hello
   	```
@@ -70,7 +76,7 @@ I will demostrate its usage with the echo service at [www.websocket.org](http://
 4. And finally to stop it
 
   	```erlang
-  	4>wsecli:stop().
+  	5>wsecli:stop().
   	```
 
 
@@ -102,7 +108,7 @@ Unit test where done with the library [_espec_](https://github.com/lucaspiller/e
 ### TODO <a name="todo">
 
 * Support streaming of data.
-* Support ssl.
+* Support _subprotocol_ and _extensions_.
 
 ###Author
 Farruco Sanjurjo. You can contact me at:

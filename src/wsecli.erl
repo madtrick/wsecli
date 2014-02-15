@@ -27,14 +27,14 @@
 -export([handle_event/3, handle_sync_event/4, handle_info/3, terminate/3, code_change/4]).
 
 -record(callbacks, {
-    on_open = fun()-> undefined end,
-    on_error = fun(_Reason)-> undefined end,
+    on_open    = fun()-> undefined end,
+    on_error   = fun(_Reason)-> undefined end,
     on_message = fun(_Type, _Message) -> undefined end,
-    on_close = fun(_Reason) -> undefined end
+    on_close   = fun(_Reason) -> undefined end
   }).
 -record(data, {
-    socket :: gen_tcp:socket(),
-    handshake :: #handshake{},
+    socket                         :: gen_tcp:socket(),
+    handshake                      :: #handshake{},
     cb  = #callbacks{},
     fragmented_message = undefined :: #message{}
   }).
@@ -43,10 +43,10 @@
 %% Types
 %%========================================
 -type encoding()            :: text | binary.
--type client_name()         :: {local, atom()} | {global, atom()} | anon.
+-type client()              :: atom() | pid().
 -type on_open_callback()    :: fun(() -> any()).
--type on_error_callback()   :: fun((Error :: string()) -> any()).
--type data_callback() :: fun((text, Payload :: string()) -> any() )| fun((binary, Payload :: binary()) -> any()).
+-type on_error_callback()   :: fun((string()) -> any()).
+-type data_callback()       :: fun((text, string()) -> any())| fun((binary, binary()) -> any()).
 -type on_message_callback() :: data_callback().
 -type on_close_callback()   :: data_callback().
 
@@ -57,6 +57,7 @@
 -define(TCP_CLOSE_TIMEOUT, 500).
 -define(DEFAULT_REG_NAME, ?MODULE).
 -define(DEFAULT_PORT_WS, 80).
+-define(DEFAULT_PORT_WSS, 443).
 
 %%========================================
 %% Public API
@@ -74,7 +75,7 @@
   {error, any()} |
   {ok, pid()}.
 start(URI, Options) ->
-  case http_uri:parse(URI, [{scheme_defaults, [{ws, ?DEFAULT_PORT_WS}]}]) of
+  case http_uri:parse(URI, [{scheme_defaults, [{wss, ?DEFAULT_PORT_WSS}, {ws, ?DEFAULT_PORT_WS}]}]) of
     {ok, {Scheme, _, Host, Port, Path, Query}} ->
       UseSSL = case Scheme of
         ws  -> false;
@@ -89,7 +90,7 @@ start(URI, Options) ->
 
 %% @doc Start the websocket client
 %%
-%% This function will open a connection with the specified remote endpoint building an URL like `ws://Host:PortResource'.
+%% This function will open a connection with the specified remote endpoint.
 %% The options to this method can be the following:
 %%
 %% <dl>
@@ -133,16 +134,17 @@ stop() ->
 %% @doc Stop the websocket client
 %%
 %% Calling this function doesn't mean that the connection will be inmediatelly closed. A
-%% closing handshake is tryed and only after that the connection is closed and the client stopped.
+%% closing handshake is tryed and only after that the connection is closed and the client stopped. Use
+%% the callback {@link on_close/2} to know when the connection has ben closed and the client has stopped.
 -spec stop(
-  Client :: client_name()
+  Client :: client()
   ) -> ok.
 stop(Client) ->
   gen_fsm:sync_send_all_state_event(Client, stop).
 
 %% @doc Send data to a remote endpoint
 %%
-%% This is the same as calling {@link send/2} with the atom `wsecli' (see {@link start/3}) as first parameter
+%% This is the same as calling {@link send/2} with the atom `wsecli' (see {@link start/4}) as first parameter
 -spec send(
   Data :: binary() | string()
   ) -> ok.
@@ -155,7 +157,7 @@ send(Data) ->
 %% determined by `is_binary' and `is_list' NIFs. So if you want to send a `text' message which is stored in a binary value you
 %% will have to use {@link send/3} and specify the type as `text'. Otherwise it will be sent as `binary' type
 -spec send(
-  Client :: client_name(),
+  Client :: client(),
   Data   :: binary() | string()
   ) -> ok.
 send(Client, Data) when is_binary(Data) ->
@@ -167,7 +169,7 @@ send(Client, Data) when is_list(Data) ->
 %%
 %% Sends data using the specified client, encoding the data as the give type.
 -spec send(
-  Client :: client_name(),
+  Client :: client(),
   Data :: binary() | string(),
   Type :: encoding()
   ) -> ok.
@@ -176,7 +178,7 @@ send(Client, Data, Type) ->
 
 %% @doc Add a callback to be called when a connection is opened
 %%
-%% This is the same as calling {@link on_open/2} with the atom `wsecli' as first parameter.
+%% This is the same as calling {@link on_open/2} with the atom `wsecli' (see {@link start/4}) as first parameter.
 -spec on_open(
   Callback :: on_open_callback()
   ) -> any().
@@ -189,7 +191,7 @@ on_open(Callback) ->
 %%or inmediatelly if added while in the open state. Adding it in any other state will
 %%raise an error.
 -spec on_open(
-  Client   :: client_name(),
+  Client   :: client(),
   Callback :: on_open_callback()
   ) -> any().
 on_open(Client, Callback) ->
@@ -197,7 +199,7 @@ on_open(Client, Callback) ->
 
 %% @doc Add a callback to be called when an error occurs
 %%
-%% This is the same as calling {@link on_error/2} with the atom `wsecli' as the first parameter.
+%% This is the same as calling {@link on_error/2} with the atom `wsecli' (see {@link start/4}) as the first parameter.
 -spec on_error(
   Callback :: on_error_callback()
   ) -> any().
@@ -206,7 +208,7 @@ on_error(Callback) ->
 
 %% @doc Add a callback to be called when an error occurs
 -spec on_error(
-  Client   :: client_name(),
+  Client   :: client(),
   Callback :: on_error_callback()
   ) -> any().
 on_error(Client, Callback) ->
@@ -214,7 +216,7 @@ on_error(Client, Callback) ->
 
 %% @doc Add a callback to be called when a message arrives
 %%
-%% This is the same as calling {@link on_message/2} with the atom `wsecli' as the first parameter.
+%% This is the same as calling {@link on_message/2} with the atom `wsecli' (see {@link start/4}) as the first parameter.
 -spec on_message(
   Callback :: on_message_callback()
   ) -> any().
@@ -223,7 +225,7 @@ on_message(Callback) ->
 
 %% @doc Add a callback to be called when a message arrives
 -spec on_message(
-  Client   :: client_name(),
+  Client   :: client(),
   Callback :: on_message_callback()
   ) -> any().
 on_message(Client, Callback) ->
@@ -231,7 +233,7 @@ on_message(Client, Callback) ->
 
 %% @doc Add a callback to be called when then connection was closed
 %%
-%% This is the same as calling {@link on_close/2} with the atom `wsecli' as the first parameter.
+%% This is the same as calling {@link on_close/2} with the atom `wsecli' (see {@link start/4}) as the first parameter.
 -spec on_close(
   Callback :: on_close_callback()
   ) -> any().
@@ -243,7 +245,7 @@ on_close(Callback) ->
 %% This callback will be called when the connection is successfully closed, i.e. after performing the
 %%websocket closing handshake.
 -spec on_close(
-  Client   :: client_name(),
+  Client   :: client(),
   Callback :: on_close_callback()
   )-> any().
 on_close(Client, Callback) ->
@@ -262,17 +264,26 @@ on_close(Client, Callback) ->
   }
   ) -> {ok, connecting, #data{}}.
 init({Host, Port, Resource, SSL}) ->
-  {ok, Socket} = gen_tcp:connect(Host, Port, [binary, {reuseaddr, true}, {packet, raw}] ),
-
+  SocketType = case SSL of true -> ssl; false -> plain end,
+  {ok, Socket}    = wsecli_socket:open(Host, Port, SocketType, self()),
   {ok, Handshake} = wsock_handshake:open(Resource, Host, Port),
-  Request = wsock_http:encode(Handshake#handshake.message),
+  Request         = wsock_http:encode(Handshake#handshake.message),
 
-  ok = gen_tcp:send(Socket, Request),
-  {ok, connecting, #data{ socket = Socket, handshake = Handshake}}.
+  wsecli_socket:send(Request, Socket),
+
+  {ok, connecting, #data{ socket = Socket, handshake = Handshake }}.
+
 
 %% @hidden
--spec connecting({on_open, Callback::fun()}, StateData::#data{}) -> term();
-                ({send, Data::binary()}, StateData::#data{}) -> term().
+-spec connecting(
+  {on_open, Callback :: fun()},
+  StateData :: #data{}
+  ) -> term()
+    ;
+  (
+  {send, Data :: binary()},
+  StateData :: #data{}
+  ) -> term().
 connecting({on_open, Callback}, StateData) ->
   Callbacks = StateData#data.cb#callbacks{on_open = Callback},
   {next_state, connecting, StateData#data{cb = Callbacks}};
@@ -282,77 +293,73 @@ connecting({send, _Data}, StateData) ->
   {next_state, connecting, StateData}.
 
 %% @hidden
--spec open(Event::term(), StateData::#data{}) -> term().
+-spec open(
+  Event     :: term(),
+  StateData :: #data{}
+  ) -> term().
 open({on_open, Callback}, StateData) ->
   spawn(Callback),
   {next_state, open, StateData};
-
 open({send, Data, Type}, StateData) ->
   Message = wsock_message:encode(Data, [mask, Type]),
-  case gen_tcp:send(StateData#data.socket, Message) of
-    ok ->
-      ok;
-    {error, Reason} ->
-      (StateData#data.cb#callbacks.on_error)(Reason)
-  end,
+  wsecli_socket:send(Message, StateData#data.socket),
   {next_state, open, StateData}.
 
 
 %% @hidden
--spec closing(Event::term(), StateData::#data{}) -> term().
+-spec closing(
+  Event     :: term(),
+  StateData :: #data{}
+  ) -> term().
 closing({send, _Data}, StateData) ->
   (StateData#data.cb#callbacks.on_error)("Can't send data while in closing state"),
   {next_state, closing, StateData};
-
-%% @hidden
 closing({timeout, _Ref, waiting_tcp_close}, StateData) ->
   %The tcp connection hasn't been close so, kill them all
   {stop, normal, StateData};
-
-%% @hidden
 closing({timeout, _Ref, waiting_close_reply}, StateData) ->
   %The websocket close handshake hasn't been properly done, kill them all
   {stop, normal, StateData}.
 
-%%%%%%%%%%%%%%%%%%%%%
-%
-% GEN FSM CALLBACK FUNCTIONS
-%
-%%%%%%%%%%%%%%%%%%%%%
+%%========================================
+%% GEN FSM CALLBACK FUNCTIONS
+%%========================================
 %% @hidden
 handle_event({on_error, Callback}, StateName, StateData) ->
   Callbacks = StateData#data.cb#callbacks{on_error = Callback},
   {next_state, StateName, StateData#data{cb = Callbacks} };
-
 handle_event({on_message, Callback}, StateName, StateData) ->
   Callbacks = StateData#data.cb#callbacks{on_message = Callback},
   {next_state, StateName, StateData#data{cb = Callbacks}};
-
 handle_event({on_close, Callback}, StateName, StateData) ->
   Callbacks = StateData#data.cb#callbacks{on_close = Callback},
   {next_state, StateName, StateData#data{cb = Callbacks}}.
 
 %% @hidden
--spec handle_sync_event(stop, pid(), atom(), #data{}) -> {stop, stop, term(), #data{}}.
+-spec handle_sync_event(
+  Event     :: stop,
+  From      :: pid(),
+  StateName :: atom(),
+  StateData :: #data{}
+  ) -> {stop, stop, term(), #data{}}.
 handle_sync_event(stop, _From, closing, StateData) ->
   {reply, {ok, closing}, closing, StateData};
-
 handle_sync_event(stop, _From, connecting, StateData) ->
   {stop, normal, {ok, closing}, StateData};
-
 handle_sync_event(stop, _From, open, StateData) ->
   Message = wsock_message:encode([], [mask, close]),
-  case gen_tcp:send(StateData#data.socket, Message) of
-    ok ->
-      gen_fsm:start_timer(?CLOSE_HANDSHAKE_TIMEOUT, waiting_close_reply),
-      {reply, {ok, closing}, closing, StateData};
-    {error, _Reason} ->
-      {stop, socket_error, {error, socket_error}, StateData }
-  end.
+  wsecli_socket:send(Message, StateData#data.socket),
+
+  gen_fsm:start_timer(?CLOSE_HANDSHAKE_TIMEOUT, waiting_close_reply),
+  {reply, {ok, closing}, closing, StateData}.
 
 %% @hidden
--spec handle_info({tcp, Socket::gen_tcp:socket(), Data::binary()}, connecting, #data{}) -> {next_state, atom(), #data{}}.
-handle_info({tcp, _Socket, Data}, connecting, StateData) ->
+-spec handle_info(
+  {socket, Value :: term()},
+  StateName :: connecting,
+  StateData :: #data{}
+  ) -> {next_state, atom(), #data{}}.
+handle_info({socket, {data, Data}}, connecting, StateData) ->
   {ok, Response} = wsock_http:decode(Data, response),
   case wsock_handshake:handle_response(Response, StateData#data.handshake) of
     {ok, _Handshake} ->
@@ -361,8 +368,7 @@ handle_info({tcp, _Socket, Data}, connecting, StateData) ->
     {error, _Error} ->
       {stop, failed_handshake, StateData}
   end;
-
-handle_info({tcp, _Socket, Data}, open, StateData) ->
+handle_info({socket, {data, Data}}, open, StateData) ->
   {Messages, State} = case StateData#data.fragmented_message of
     undefined ->
       {wsock_message:decode(Data, []), StateData};
@@ -371,8 +377,7 @@ handle_info({tcp, _Socket, Data}, open, StateData) ->
   end,
   NewStateData = process_messages(Messages, State),
   {next_state, open, NewStateData};
-
-handle_info({tcp, _Socket, Data}, closing, StateData) ->
+handle_info({socket, {data, Data}}, closing, StateData) ->
   [Message] = wsock_message:decode(Data, []),
   case Message#message.type of
     close ->
@@ -382,30 +387,32 @@ handle_info({tcp, _Socket, Data}, closing, StateData) ->
     _ ->
       {next_state, closing, StateData}
   end;
-
-
-handle_info({tcp_closed, _}, _StateName, StateData) ->
- {stop, normal, StateData}.
+handle_info({socket, close}, _StateName, StateData) ->
+  {stop, normal, StateData}.
 
 %% @hidden
--spec terminate(Reason::atom(), StateName::atom(), #data{}) -> [].
+-spec terminate(
+  Reason::atom(),
+  StateName::atom(),
+  StateData :: #data{}
+  ) -> pid().
 terminate(_Reason, _StateName, StateData) ->
-  gen_tcp:close(StateData#data.socket),
+  wsecli_socket:close(StateData#data.socket),
   spawn(fun() -> (StateData#data.cb#callbacks.on_close)(undefined) end).
 
 %% @hidden
 code_change(_OldVsn, StateName, StateData, _Extra) ->
   {ok, StateName, StateData}.
 
-%%%%%%%%%%%%%%%%%%%%%
-%
-% GEN FSM INTERNAL
-%
-%%%%%%%%%%%%%%%%%%%%%
--spec process_messages(Messages :: list(#message{}), StateData :: #data{}) -> #data{}.
+%%========================================
+%% Internal
+%%========================================
+-spec process_messages(
+  Messages  :: list(#message{}),
+  StateData :: #data{}
+  ) -> #data{}.
 process_messages([], StateData) ->
   StateData;
-
 process_messages([Message | Messages], StateData) ->
   case Message#message.type of
     text ->
