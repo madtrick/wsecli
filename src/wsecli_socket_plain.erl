@@ -29,7 +29,7 @@ start_link(Host, Port, Client, Options) ->
 
 -spec init(
   Host    :: string(),
-  Port    :: pos_integer(),
+  Port    :: inet:port_number(),
   Client  :: pid(),
   Options :: list(gen_tcp:connect_option())
   ) -> ok.
