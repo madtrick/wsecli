@@ -338,10 +338,11 @@ handle_event({on_close, Callback}, StateName, StateData) ->
 %% @hidden
 -spec handle_sync_event(
   Event     :: stop,
-  From      :: pid(),
+  From      :: {pid(), reference()},
   StateName :: atom(),
   StateData :: #data{}
-  ) -> {stop, stop, term(), #data{}}.
+  ) -> {reply, term(), atom(), term()} |
+       {stop, term(), term(), #data{}}.
 handle_sync_event(stop, _From, closing, StateData) ->
   {reply, {ok, closing}, closing, StateData};
 handle_sync_event(stop, _From, connecting, StateData) ->
