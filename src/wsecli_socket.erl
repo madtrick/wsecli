@@ -37,7 +37,7 @@ open(Host, Port, ssl, Client) ->
   wsecli_socket_ssl:start_link(Host, Port, Client, ?DEFAULT_SOCKET_OPTIONS).
 
 -spec send(
-  Data   :: binary(),
+  Data   :: iolist(),
   Socket :: socket()
   ) -> ok.
 send(Data, Socket) ->
