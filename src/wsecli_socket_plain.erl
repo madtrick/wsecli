@@ -20,18 +20,18 @@
 %%========================================
 -spec start_link(
   Host    :: string(),
-  Port    :: pos_integer(),
+  Port    :: inet:port_number(),
   Client  :: pid(),
-  Options :: list({atom(), term()})
-) -> {ok, socket()}.
+  Options :: list(gen_tcp:connect_option())
+) -> {ok, socket()} | {error, term()}.
 start_link(Host, Port, Client, Options) ->
   proc_lib:start_link(?MODULE, init, [Host, Port, Client, Options]).
 
 -spec init(
   Host    :: string(),
-  Port    :: pos_integer(),
+  Port    :: inet:port_number(),
   Client  :: pid(),
-  Options :: list({atom(), term()})
+  Options :: list(gen_tcp:connect_option())
   ) -> ok.
 init(Host, Port, Client, Options) ->
   {ok, Socket} = gen_tcp:connect(Host, Port, Options),

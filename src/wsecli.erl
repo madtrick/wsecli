@@ -33,10 +33,10 @@
     on_close   = fun(_Reason) -> undefined end
   }).
 -record(data, {
-    socket                         :: gen_tcp:socket(),
-    handshake                      :: #handshake{},
+    socket                         :: inet:socket(),
+    handshake                      :: undefined | #handshake{},
     cb  = #callbacks{},
-    fragmented_message = undefined :: #message{}
+    fragmented_message = undefined :: undefined | #message{}
   }).
 
 %%========================================
@@ -46,9 +46,9 @@
 -type client()              :: atom() | pid().
 -type on_open_callback()    :: fun(() -> any()).
 -type on_error_callback()   :: fun((string()) -> any()).
--type data_callback()       :: fun((text, string()) -> any())| fun((binary, binary()) -> any()).
+-type data_callback()       :: fun((text, string()) -> any()) | fun((binary, binary()) -> any()).
 -type on_message_callback() :: data_callback().
--type on_close_callback()   :: data_callback().
+-type on_close_callback()   :: fun((undefined) -> any()).
 
 %%========================================
 %% Constants
@@ -258,7 +258,7 @@ on_close(Client, Callback) ->
 -spec init(
   {
     Host     :: string(),
-    Port     :: integer(),
+    Port     :: inet:port_number(),
     Resource :: string(),
     SSL      :: boolean()
   }
@@ -338,10 +338,11 @@ handle_event({on_close, Callback}, StateName, StateData) ->
 %% @hidden
 -spec handle_sync_event(
   Event     :: stop,
-  From      :: pid(),
+  From      :: {pid(), reference()},
   StateName :: atom(),
   StateData :: #data{}
-  ) -> {stop, stop, term(), #data{}}.
+  ) -> {reply, term(), atom(), term()} |
+       {stop, term(), term(), #data{}}.
 handle_sync_event(stop, _From, closing, StateData) ->
   {reply, {ok, closing}, closing, StateData};
 handle_sync_event(stop, _From, connecting, StateData) ->

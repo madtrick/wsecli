@@ -25,7 +25,7 @@
 %%========================================
 -spec open(
   Host    :: string(),
-  Port    :: pos_integer(),
+  Port    :: inet:port_number(),
   Type    :: socket_type(),
   Client  :: pid()
   ) ->
@@ -37,17 +37,19 @@ open(Host, Port, ssl, Client) ->
   wsecli_socket_ssl:start_link(Host, Port, Client, ?DEFAULT_SOCKET_OPTIONS).
 
 -spec send(
-  Data   :: binary(),
+  Data   :: iolist(),
   Socket :: socket()
   ) -> ok.
 send(Data, Socket) ->
-  Socket ! {socket, send, Data}.
+  Socket ! {socket, send, Data},
+  ok.
 
 -spec close(
   Socket :: socket()
   ) -> ok.
 close(Socket) ->
-  Socket ! {socket, close}.
+  Socket ! {socket, close},
+  ok.
 
 %%========================================
 %% Socket API to interact with client
