@@ -41,13 +41,15 @@ open(Host, Port, ssl, Client) ->
   Socket :: socket()
   ) -> ok.
 send(Data, Socket) ->
-  Socket ! {socket, send, Data}.
+  Socket ! {socket, send, Data},
+  ok.
 
 -spec close(
   Socket :: socket()
   ) -> ok.
 close(Socket) ->
-  Socket ! {socket, close}.
+  Socket ! {socket, close},
+  ok.
 
 %%========================================
 %% Socket API to interact with client
