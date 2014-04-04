@@ -258,7 +258,7 @@ on_close(Client, Callback) ->
 -spec init(
   {
     Host     :: string(),
-    Port     :: integer(),
+    Port     :: inet:port_number(),
     Resource :: string(),
     SSL      :: boolean()
   }

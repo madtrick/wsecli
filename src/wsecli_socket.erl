@@ -25,7 +25,7 @@
 %%========================================
 -spec open(
   Host    :: string(),
-  Port    :: pos_integer(),
+  Port    :: inet:port_number(),
   Type    :: socket_type(),
   Client  :: pid()
   ) ->
