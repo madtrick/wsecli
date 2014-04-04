@@ -34,9 +34,9 @@
   }).
 -record(data, {
     socket                         :: inet:socket(),
-    handshake                      :: #handshake{},
+    handshake                      :: undefined | #handshake{},
     cb  = #callbacks{},
-    fragmented_message = undefined :: #message{}
+    fragmented_message = undefined :: undefined | #message{}
   }).
 
 %%========================================
