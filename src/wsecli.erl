@@ -46,9 +46,9 @@
 -type client()              :: atom() | pid().
 -type on_open_callback()    :: fun(() -> any()).
 -type on_error_callback()   :: fun((string()) -> any()).
--type data_callback()       :: fun((text, string()) -> any())| fun((binary, binary()) -> any()).
+-type data_callback()       :: fun((text, string()) -> any()) | fun((binary, binary()) -> any()).
 -type on_message_callback() :: data_callback().
--type on_close_callback()   :: data_callback().
+-type on_close_callback()   :: fun((undefined) -> any()).
 
 %%========================================
 %% Constants
