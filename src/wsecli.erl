@@ -33,7 +33,7 @@
     on_close   = fun(_Reason) -> undefined end
   }).
 -record(data, {
-    socket                         :: gen_tcp:socket(),
+    socket                         :: inet:socket(),
     handshake                      :: #handshake{},
     cb  = #callbacks{},
     fragmented_message = undefined :: #message{}

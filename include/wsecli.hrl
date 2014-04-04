@@ -1,1 +1,1 @@
--type socket() :: gen_tcp:socket() | ssl:sslsocket().
+-type socket() :: inet:socket() | ssl:sslsocket().
