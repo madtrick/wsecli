@@ -1,5 +1,9 @@
 #Change Log
 
+### 1.1.0
+  * Typespec fixes
+  * Include makefile and deprecate rake tasks
+
 ### 1.0.0
   * New wsecli:start/2 function that takes a WebSockets URI as parameter.
   * The use of the 'anon' atom to request a non registered process has been deprecated. Now use the {register, true | false | atom()} option.
