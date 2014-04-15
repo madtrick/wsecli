@@ -1,5 +1,8 @@
 #Change Log
 
+### 1.1.1
+  * Update rebar.confi to fetch wsock 1.1.5
+
 ### 1.1.0
   * Typespec fixes
   * Include makefile and deprecate rake tasks
