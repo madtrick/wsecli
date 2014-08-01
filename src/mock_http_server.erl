@@ -20,7 +20,6 @@
 %-export([start/2, stop/0]).
 -export([start/2, stop/0]).
 -export([init/1, handle_cast/2, handle_call/3, handle_info/2, terminate/2, code_change/3]).
--export([accept_loop/1]).
 
 -record(state, { socket,
                  test_process,
@@ -33,26 +32,24 @@ stop()->
     gen_server:call(mock_http_server, stop).
 
 init([TestProcess, Port]) ->
-    {ok, Socket} = gen_tcp:listen(Port, [{reuseaddr, true}, {packet, raw}, binary]),
-    accept(Socket),
+    {ok, Socket} = gen_tcp:listen(Port, [{reuseaddr, true}, {active, false},
+                                         {packet, 0}, binary]),
+    defer_accept(Socket),
     NewState = #state{socket = Socket, test_process = TestProcess, handshaked = false},
     {ok, NewState}.
 
+defer_accept(Socket) ->
+    self() ! {accept, Socket}.
 
-accept(Socket) ->
-    spawn(?MODULE, accept_loop, [Socket]).
-
-accept_loop(LSocket) ->
+handle_info({accept, LSocket}, #state{} = S) ->
     {ok, Socket} = gen_tcp:accept(LSocket),
-    ok = gen_tcp:controlling_process(Socket, whereis(mock_http_server)),
-    gen_server:cast(mock_http_server, {accepted, Socket}).
+    NewS = S#state{socket = Socket},
+    inet:setopts(Socket, [{active, once}]),
+    {noreply, NewS};
 
-handle_cast({accepted, Socket}, State) ->
-    NewState = State#state{socket = Socket},
-    {noreply, NewState}.
-
-handle_info({tcp, _Socket, Data}, State) ->
-    case State#state.handshaked  of
+handle_info({tcp, Socket, Data}, State) ->
+    inet:setopts(Socket, [{active, once}]),
+    case State#state.handshaked of
         true ->
             receive_data(State#state.test_process, Data, State),
             {noreply, State};
@@ -62,22 +59,27 @@ handle_info({tcp, _Socket, Data}, State) ->
             {noreply, NewState}
     end;
 
-
-handle_info(_Msg, Library) -> {noreply, Library}.
+handle_info(_Msg, State) ->
+    {noreply, State}.
 
 handle_call(stop, _, State) ->
     {stop, normal, exit, State};
 
-handle_call(_Msg, _Caller, State) -> {noreply, State}.
+handle_call(_Msg, _Caller, State) ->
+    {noreply, State}.
+
+handle_cast(_, State) ->
+    {noreply, State}.
 
 terminate(_, State) ->
     gen_tcp:close(State#state.socket).
 
-code_change(_OldVersion, Library, _Extra) -> {ok, Library}.
+code_change(_OldVersion, Library, _Extra) ->
+    {ok, Library}.
 
-%
-% Internal
-%
+%%
+%% Internal
+%%
 receive_data(TestProcess, Data, State) ->
     TestProcess ! {mock_http_server, received_data},
     <<_:4, Opcode:4, _:1, Length:7, _/binary>> = Data,
@@ -100,14 +102,13 @@ receive_data(TestProcess, Data, State) ->
     end.
 
 handshake(Data, State) ->
-
     {ok, {http_request, Method, Uri, Version}, Rest} = erlang:decode_packet(http, Data, []),
 
     Headers = headers(Rest, []),
     Request = {request, [{method, Method}, {uri, Uri}, {version, Version}], headers, Headers},
     BinaryClientKey = list_to_binary(get_header_value("sec-websocket-key", Headers)),
 
-    %State#state.test_process ! Request,
+    State#state.test_process ! Request,
     HandShake = [
                  "HTTP/1.1 101 Web Socket Protocol Handshake\r\n",
                  "Upgrade: WebSocket\r\n",
