@@ -27,21 +27,24 @@
 -export([handle_event/3, handle_sync_event/4, handle_info/3, terminate/3, code_change/4]).
 
 -record(callbacks, {
-    on_open    = fun()-> undefined end,
-    on_error   = fun(_Reason)-> undefined end,
-    on_message = fun(_Type, _Message) -> undefined end,
-    on_close   = fun(_Reason) -> undefined end
+    on_open    :: on_open_callback(),
+    on_error   :: on_error_callback(),
+    on_message :: on_message_callback(),
+    on_close   :: on_close_callback()
   }).
+
 -record(data, {
     socket                         :: inet:socket(),
     handshake                      :: undefined | #handshake{},
-    cb  = #callbacks{},
+    cb = default_callbacks()       :: callbacks(),
     fragmented_message = undefined :: undefined | #message{}
   }).
 
 %%========================================
 %% Types
 %%========================================
+-type callbacks()           :: #callbacks{}.
+-type data()                :: #data{}.
 -type encoding()            :: text | binary.
 -type client()              :: atom() | pid().
 -type on_open_callback()    :: fun(() -> any()).
@@ -277,12 +280,12 @@ init({Host, Port, Resource, SSL}) ->
 %% @hidden
 -spec connecting(
   {on_open, Callback :: fun()},
-  StateData :: #data{}
+  StateData :: data()
   ) -> term()
     ;
   (
   {send, Data :: binary()},
-  StateData :: #data{}
+  StateData :: data()
   ) -> term().
 connecting({on_open, Callback}, StateData) ->
   Callbacks = StateData#data.cb#callbacks{on_open = Callback},
@@ -295,7 +298,7 @@ connecting({send, _Data}, StateData) ->
 %% @hidden
 -spec open(
   Event     :: term(),
-  StateData :: #data{}
+  StateData :: data()
   ) -> term().
 open({on_open, Callback}, StateData) ->
   spawn(Callback),
@@ -309,7 +312,7 @@ open({send, Data, Type}, StateData) ->
 %% @hidden
 -spec closing(
   Event     :: term(),
-  StateData :: #data{}
+  StateData :: data()
   ) -> term().
 closing({send, _Data}, StateData) ->
   (StateData#data.cb#callbacks.on_error)("Can't send data while in closing state"),
@@ -340,7 +343,7 @@ handle_event({on_close, Callback}, StateName, StateData) ->
   Event     :: stop,
   From      :: {pid(), reference()},
   StateName :: atom(),
-  StateData :: #data{}
+  StateData :: data()
   ) -> {reply, term(), atom(), term()} |
        {stop, term(), term(), #data{}}.
 handle_sync_event(stop, _From, closing, StateData) ->
@@ -358,7 +361,7 @@ handle_sync_event(stop, _From, open, StateData) ->
 -spec handle_info(
   {socket, Value :: term()},
   StateName :: connecting,
-  StateData :: #data{}
+  StateData :: data()
   ) -> {next_state, atom(), #data{}}.
 handle_info({socket, {data, Data}}, connecting, StateData) ->
   {ok, Response} = wsock_http:decode(Data, response),
@@ -395,7 +398,7 @@ handle_info({socket, close}, _StateName, StateData) ->
 -spec terminate(
   Reason::atom(),
   StateName::atom(),
-  StateData :: #data{}
+  StateData :: data()
   ) -> pid().
 terminate(_Reason, _StateName, StateData) ->
   wsecli_socket:close(StateData#data.socket),
@@ -410,7 +413,7 @@ code_change(_OldVsn, StateName, StateData, _Extra) ->
 %%========================================
 -spec process_messages(
   Messages  :: list(#message{}),
-  StateData :: #data{}
+  StateData :: data()
   ) -> #data{}.
 process_messages([], StateData) ->
   StateData;
@@ -426,3 +429,10 @@ process_messages([Message | Messages], StateData) ->
       NewStateData = StateData#data{fragmented_message = Message},
       process_messages(Messages, NewStateData)
   end.
+
+-spec default_callbacks() -> callbacks().
+default_callbacks() ->
+    #callbacks{on_open = fun() -> undefined end,
+               on_error = fun(_Reason)-> undefined end,
+               on_message = fun(_Type, _Message) -> undefined end,
+               on_close = fun(_Reason) -> undefined end}.
