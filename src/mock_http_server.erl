@@ -23,7 +23,7 @@
 
 -record(state, { socket,
                  test_process,
-                 handshaked }).
+                 handshake_exchanged }).
 
 start(TestProcess, Port)->
     gen_server:start({local, mock_http_server}, ?MODULE, [TestProcess, Port], []).
@@ -35,7 +35,7 @@ init([TestProcess, Port]) ->
     {ok, Socket} = gen_tcp:listen(Port, [{reuseaddr, true}, {active, false},
                                          {packet, 0}, binary]),
     defer_accept(Socket),
-    NewState = #state{socket = Socket, test_process = TestProcess, handshaked = false},
+    NewState = #state{socket = Socket, test_process = TestProcess, handshake_exchanged = false},
     {ok, NewState}.
 
 defer_accept(Socket) ->
@@ -49,13 +49,13 @@ handle_info({accept, LSocket}, #state{} = S) ->
 
 handle_info({tcp, Socket, Data}, State) ->
     inet:setopts(Socket, [{active, once}]),
-    case State#state.handshaked of
+    case State#state.handshake_exchanged of
         true ->
             receive_data(State#state.test_process, Data, State),
             {noreply, State};
         false ->
             handshake(Data, State),
-            NewState = State#state{handshaked = true},
+            NewState = State#state{handshake_exchanged = true},
             {noreply, NewState}
     end;
 
