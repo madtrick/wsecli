@@ -5,7 +5,8 @@
 -include_lib("hamcrest/include/hamcrest.hrl").
 
 all() ->
-    [do_handshake].
+    [do_handshake,
+     send_data].
 
 suite() ->
     [].
@@ -14,6 +15,7 @@ init_per_testcase(_CaseName, Config) ->
     Config.
 
 end_per_testcase(_CaseName, Config) ->
+    mock_http_server:stop(),
     Config.
 
 %%
@@ -22,8 +24,9 @@ end_per_testcase(_CaseName, Config) ->
 
 do_handshake(_) ->
     Server = given_running_websocket_server(),
-    when_i_want_to_connect_to_a_websocket_server(Server),
-    then_i_upgrade_the_connection_with_a_websocket_handshake().
+    WebSocket = when_i_want_to_connect_to_a_websocket_server(Server),
+    then_i_upgrade_the_connection_with_a_websocket_handshake(),
+    wsecli:stop(WebSocket).
 
 %%
 %% Helpers
@@ -35,7 +38,13 @@ given_running_websocket_server() ->
     {"localhost", Port, "/"}.
 
 when_i_want_to_connect_to_a_websocket_server({Host, Port, Path}) ->
-    wsecli:start(Host, Port, Path, []).
+    websocket_connect(Host, Port, Path).
+
+websocket_connect(Host, Port, Path) ->
+    case wsecli:start(Host, Port, Path, []) of
+        {ok, WebSocket} -> WebSocket;
+        _ -> error(wsecli_start_error, [Host, Port, Path])
+    end.
 
 then_i_upgrade_the_connection_with_a_websocket_handshake() ->
     %% Message sent by the mock server
