@@ -1,4 +1,4 @@
-[![Analytics](https://ga-beacon.appspot.com/UA-46795389-1/wsecli/README)](https://github.com/igrigorik/ga-beacon) [![Build Status](https://travis-ci.org/madtrick/wsecli.png)](https://travis-ci.org/madtrick/wsecli)
+[![Analytics](https://ga-beacon.appspot.com/UA-46795389-1/wsecli/README)](https://github.com/igrigorik/ga-beacon) [![Build Status](https://travis-ci.org/esl/wsecli.png)](https://travis-ci.org/esl/wsecli)
 
 
 wsecli
@@ -27,7 +27,7 @@ Only the protocol specificied at [RFC6455](http://tools.ietf.org/html/rfc6455) (
 Add this repo as a dependency to your rebar.config file
 
 ```erlang
-{wsecli, ".*", {git, "https://github.com/madtrick/wsecli", {tag, master}}}
+{wsecli, ".*", {git, "https://github.com/esl/wsecli", {tag, master}}}
 ```
 
 and then
