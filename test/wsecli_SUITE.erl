@@ -28,6 +28,13 @@ do_handshake(_) ->
     then_i_upgrade_the_connection_with_a_websocket_handshake(),
     wsecli:stop(WebSocket).
 
+send_data(_) ->
+    Server = given_running_websocket_server(),
+    WebSocket = when_i_send_data_to_server(Server),
+    Encoded = then_i_encapsulate_data_according_to_the_rfc([]),
+    then_i_send_it_to_the_server(WebSocket, Encoded),
+    wsecli:stop(WebSocket).
+
 %%
 %% Helpers
 %%
@@ -74,3 +81,19 @@ get_request_version(Request) ->
 
 get_request_value(Key, Request) ->
     proplists:get_value(Key, Request).
+
+when_i_send_data_to_server({Host, Port, Path}) ->
+    websocket_connect(Host, Port, Path).
+
+then_i_encapsulate_data_according_to_the_rfc(_Data) ->
+    %% TODO: what do we do here?
+    ok.
+
+then_i_send_it_to_the_server(WebSocket, _Encoded) ->
+    wsecli:send(WebSocket, "La casa de la pradera"),
+    receive
+        {sent, Data} ->
+            Data
+    end,
+    %% Assertions for wsecli protocol framing.
+    ct:fail(unfinished).
