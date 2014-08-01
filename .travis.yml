@@ -1,9 +1,13 @@
 language: erlang
 otp_release:
-   - R16B02
-   - R16B01
-   - R15B03
-   - R15B02
-   - R15B01
+    - 17.1
+    - R16B03
+    - R15B03
 
-script: "./rebar get-deps && ./rebar compile"
+script:
+    - make
+    - make dialyzer
+    - make test
+
+after_script:
+    - if [ -s dialyzer/error.log ]; then cat dialyzer/error.log; fi
